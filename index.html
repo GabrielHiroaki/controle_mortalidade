@@ -340,7 +340,7 @@ class="mortalidade"
 type="number"
 min="0"
 value="0"
-oninput="calcular(); autoSalvar();">
+oninput="calcular();">
 </td>`;
 }
 html+=`
@@ -843,7 +843,6 @@ document
 
 });
 document.getElementById("produtor").addEventListener("input", autoSalvar);
-document.getElementById("galpao").addEventListener("input", autoSalvar);
 document.getElementById("gta").addEventListener("input", autoSalvar);
 document.getElementById("avesInicial").addEventListener("input", autoSalvar);
 
