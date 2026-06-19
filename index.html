@@ -339,7 +339,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 let timerAutoSave = null;
 let salvando = false;
-
+let loteAtual = "";
 function gerarTabela(){
 
 const tbody = document.getElementById("tbody");
@@ -607,7 +607,23 @@ async function salvarLote(auto = false) {
             .value
             .trim()
             .toUpperCase();
-
+        // Se mudou o nome do lote, verifica se já existe
+        if (nome !== loteAtual && nome !== "") {
+        
+            const existe = await getDoc(
+                doc(db, "lotes", nome)
+            );
+        
+            if (existe.exists()) {
+        
+                alert(
+                    "Já existe um lote com esse nome.\n\n" +
+                    "Escolha outro nome para não sobrescrever o existente."
+                );
+        
+                return;
+            }
+        }
         if (!nome) {
             alert("Informe o Nº GALPÃO / LOTE.");
             document.getElementById("galpao").focus();
@@ -658,6 +674,18 @@ async function salvarLote(auto = false) {
         });
 
         await setDoc(doc(db, "lotes", nome), dados);
+        
+        // Se renomeou o lote, apaga o antigo
+        if (
+            loteAtual &&
+            loteAtual !== nome
+        ) {
+            await deleteDoc(
+                doc(db, "lotes", loteAtual)
+            );
+        }
+        
+        loteAtual = nome;
 
         if (!auto) {
             await carregarLista();
@@ -735,7 +763,7 @@ async function carregarLote(nome){
         }
 
         const d = snap.data();
-
+        loteAtual = nome;
         document.getElementById("produtor").value =
         d.produtor || "";
 
@@ -794,7 +822,7 @@ async function carregarLote(nome){
 }
 
 function novoLote() {
-
+    loteAtual = "";
     document.getElementById("produtor").value = "";
     document.getElementById("nascimento").value = "";
     document.getElementById("galpao").value = "";
