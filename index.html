@@ -316,7 +316,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 let timerAutoSave = null;
-
+let salvando = false;
 
 function gerarTabela(){
 
@@ -557,55 +557,57 @@ function autoSalvar() {
     }, 1000); 
 
 }
-async function salvarLote(auto = false){
+async function salvarLote(auto = false) {
+
+    if (salvando) return;
+
+    salvando = true;
     clearTimeout(timerAutoSave);
-    const nome = document.getElementById("galpao").value.trim();
 
-    if (!nome) {
-        alert("Informe o Nº GALPÃO / LOTE.");
-        document.getElementById("galpao").focus();
-        return;
-    }
+    try {
 
-    if(!document.getElementById("produtor").value){
-        alert("Informe o produtor");
-        return;
-    }
+        const nome = document
+            .getElementById("galpao")
+            .value
+            .trim()
+            .toUpperCase();
 
-    if(!document.getElementById("nascimento").value){
-        alert("Informe a data de nascimento");
-        return;
-    }
+        if (!nome) {
+            alert("Informe o Nº GALPÃO / LOTE.");
+            document.getElementById("galpao").focus();
+            return;
+        }
 
-    try{
+        if (!document.getElementById("produtor").value.trim()) {
+            alert("Informe o produtor.");
+            return;
+        }
 
-        let dados = {
+        if (!document.getElementById("nascimento").value) {
+            alert("Informe a data de nascimento.");
+            return;
+        }
 
-            produtor: document.getElementById("produtor").value,
+        const dados = {
+            produtor: document.getElementById("produtor").value.trim(),
             nascimento: document.getElementById("nascimento").value,
-            galpao: document.getElementById("galpao").value,
+            galpao: nome,
             avesInicial: document.getElementById("avesInicial").value,
-            gta: document.getElementById("gta").value,
-            mortalidade:{}
+            gta: document.getElementById("gta").value.trim(),
+            mortalidade: {}
         };
 
         let semanaNumero = 1;
 
-        document
-        .querySelectorAll("#tbody tr")
-        .forEach(linha=>{
+        document.querySelectorAll("#tbody tr").forEach(linha => {
 
-            let arr=[];
+            const arr = [];
 
-            linha.querySelectorAll("input")
-            .forEach(inp=>{
-
+            linha.querySelectorAll("input").forEach(inp => {
                 arr.push(Number(inp.value) || 0);
-
             });
 
             dados.mortalidade["semana_" + semanaNumero] = {
-
                 qui: arr[0],
                 sex: arr[1],
                 sab: arr[2],
@@ -613,36 +615,32 @@ async function salvarLote(auto = false){
                 seg: arr[4],
                 ter: arr[5],
                 qua: arr[6]
-
             };
 
             semanaNumero++;
 
         });
-        await setDoc(
-            doc(db, "lotes", nome),
-            dados
-        );
+
+        await setDoc(doc(db, "lotes", nome), dados);
 
         if (!auto) {
-            alert("Salvo no Firestore");
-
             await carregarLista();
             document.getElementById("listaLotes").value = nome;
             await carregarLote(nome);
+            alert("Salvo no Firestore!");
         }
 
-    }catch(error){
+    } catch (error) {
 
         console.error(error);
+        alert("Erro ao salvar:\n\n" + error.message);
 
-        alert(
-            "Erro ao salvar:\n\n" +
-            error.message
-        );
+    } finally {
+
+        // Garante que a trava seja liberada mesmo se houver return ou erro
+        salvando = false;
 
     }
-
 }
 
 async function carregarLista(){
