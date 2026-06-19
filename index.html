@@ -121,7 +121,7 @@ table{
 }
 
 thead th{
-    background:#2563eb;
+    background:#1e40af;
     color:#fff;
     padding:12px;
     font-size:14px;
@@ -136,20 +136,41 @@ tbody td{
 }
 
 tbody tr:nth-child(even){
-    background:#fafafa;
+    background:#f0f4f8;
 }
 
-tbody tr:hover{
-    background:#eef6ff;
+tbody tr:nth-child(odd){
+    background:#ffffff;
+}
+
+tbody tr:hover td{
+    background:#dbeafe !important;
 }
 
 .mortalidade{
     width:65px;
     height:34px;
-    text-align:center;
-    border-radius:8px;
+    background:#f8fafc;
+    border:1px solid #cbd5e1;
+    font-weight:bold;
+    color:#1e293b;
+}
+.semanaTotal{
+    background:#fff7d6;
+    font-weight:bold;
 }
 
+.acumulado{
+    background:#ffe5e5;
+    font-weight:bold;
+    color:#b91c1c;
+}
+
+.efetivo{
+    background:#dcfce7;
+    font-weight:bold;
+    color:#166534;
+}
 .periodoSemana{
     cursor:pointer;
     color:#2563eb;
@@ -378,7 +399,21 @@ linha.querySelectorAll("input");
 let soma=0;
 
 inputs.forEach(i=>{
-soma+=Number(i.value)||0;
+
+    const valor = Number(i.value) || 0;
+
+    soma += valor;
+
+    if(valor > 0){
+        i.style.background = "#fee2e2";
+        i.style.color = "#b91c1c";
+        i.style.fontWeight = "bold";
+    }else{
+        i.style.background = "#f8fafc";
+        i.style.color = "#111";
+        i.style.fontWeight = "normal";
+    }
+
 });
 
 acumulado+=soma;
