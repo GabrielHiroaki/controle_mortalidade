@@ -554,11 +554,11 @@ function autoSalvar() {
             salvarLote(true);
         }
 
-    }, 300); 
+    }, 1000); 
 
 }
 async function salvarLote(auto = false){
-
+    clearTimeout(timerAutoSave);
     const nome = document.getElementById("galpao").value.trim();
 
     if (!nome) {
@@ -619,15 +619,10 @@ async function salvarLote(auto = false){
             semanaNumero++;
 
         });
-
         await setDoc(
-            doc(db,"lotes",nome),
+            doc(db, "lotes", nome),
             dados
         );
-
-        if (!auto) {
-            alert("Salvo no Firestore");
-        }
 
         if (!auto) {
             alert("Salvo no Firestore");
