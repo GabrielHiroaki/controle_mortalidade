@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Controle de Mortalidade Semanal</title>
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Arial, Helvetica, sans-serif;
+}
+
+body{
+    background:#eef3f8;
+    padding:25px;
+    color:#333;
+}
+
+.container{
+    max-width:1700px;
+    margin:auto;
+}
+
+.card{
+    background:#fff;
+    border-radius:16px;
+    padding:22px;
+    margin-bottom:20px;
+    box-shadow:0 8px 25px rgba(0,0,0,.08);
+}
+
+.titulo{
+    font-size:32px;
+    font-weight:bold;
+    text-align:center;
+    color:#1e3a8a;
+    margin-bottom:20px;
+}
+
+.top-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+    gap:18px;
+}
+
+.top-grid > div{
+    display:flex;
+    flex-direction:column;
+}
+
+.info{
+    font-size:13px;
+    font-weight:700;
+    color:#555;
+    margin-bottom:6px;
+    letter-spacing:.4px;
+}
+
+input,
+select{
+    width:100%;
+    height:44px;
+    padding:0 12px;
+    border:1px solid #d8dde5;
+    border-radius:10px;
+    font-size:15px;
+    transition:.2s;
+    background:#fff;
+}
+
+input:focus,
+select:focus{
+    outline:none;
+    border-color:#2563eb;
+    box-shadow:0 0 0 3px rgba(37,99,235,.15);
+}
+
+input[readonly]{
+    background:#f3f6fb;
+    font-weight:bold;
+    color:#1d4ed8;
+}
+
+button{
+    border:none;
+    border-radius:10px;
+    padding:11px 18px;
+    margin:4px;
+    cursor:pointer;
+    font-size:14px;
+    font-weight:bold;
+    transition:.2s;
+    color:#fff;
+}
+
+button:hover{
+    transform:translateY(-2px);
+}
+
+button:nth-of-type(1){
+    background:#16a34a;
+}
+
+button:nth-of-type(2){
+    background:#2563eb;
+}
+
+button:nth-of-type(3){
+    background:#dc2626;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+    overflow:hidden;
+    border-radius:12px;
+    background:#fff;
+}
+
+thead th{
+    background:#2563eb;
+    color:#fff;
+    padding:12px;
+    font-size:14px;
+    position:sticky;
+    top:0;
+}
+
+tbody td{
+    border-bottom:1px solid #ececec;
+    padding:8px;
+    text-align:center;
+}
+
+tbody tr:nth-child(even){
+    background:#fafafa;
+}
+
+tbody tr:hover{
+    background:#eef6ff;
+}
+
+.mortalidade{
+    width:65px;
+    height:34px;
+    text-align:center;
+    border-radius:8px;
+}
+
+.periodoSemana{
+    cursor:pointer;
+    color:#2563eb;
+    font-weight:bold;
+    transition:.2s;
+}
+
+.periodoSemana:hover{
+    text-decoration:underline;
+}
+
+#tbody tr.linhaSelecionada td{
+    background:#fff4cc !important;
+    transition:.2s;
+}
+
+@media(max-width:900px){
+
+    body{
+        padding:10px;
+    }
+
+    .card{
+        padding:15px;
+    }
+
+    .titulo{
+        font-size:24px;
+    }
+
+    table{
+        font-size:12px;
+    }
+
+    .mortalidade{
+        width:50px;
+    }
+
+}
+
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<div class="card">
+
+    <div class="titulo">
+        MORTALIDADE SEMANAL
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:center;">
+
+        <select id="listaLotes" style="max-width:300px;"></select>
+
+        <button onclick="novoLote()">➕ Novo Lote</button>
+
+        <button onclick="salvarLote()">💾 Salvar</button>
+
+        <button onclick="excluirLote()">🗑 Excluir</button>
+
+    </div>
+
+</div>
+
+<div class="card">
+
+<div class="top-grid">
+
+<div>
+<label class="info">PRODUTOR</label><br>
+<input id="produtor" style="width:95%">
+</div>
+
+<div>
+<label class="info">DATA NASCIMENTO</label><br>
+<input type="date" id="nascimento">
+</div>
+
+<div>
+<label class="info">Nº GALPÃO / LOTE</label><br>
+<input id="galpao" style="width:95%">
+</div>
+
+<div>
+<label class="info">Nº AVES INICIAL</label><br>
+<input type="number" id="avesInicial">
+</div>
+
+<div>
+<label class="info">GTA</label><br>
+<input id="gta" style="width:95%">
+</div>
+
+<div>
+<label class="info">IDADE</label><br>
+<input id="idade" readonly style="width:95%">
+</div>
+
+<div>
+<label class="info">FASE</label><br>
+<input id="fase" readonly style="width:95%">
+</div>
+
+</div>
+
+</div>
+
+<div class="card">
+
+<table id="tabela">
+
+<thead>
+<tr>
+<th>SEMANA</th>
+<th>QUI</th>
+<th>SEX</th>
+<th>SAB</th>
+<th>DOM</th>
+<th>SEG</th>
+<th>TER</th>
+<th>QUA</th>
+<th>PERÍODO</th>
+<th>POR SEMANA</th>
+<th>ACUM.</th>
+<th>EFETIVO</th>
+</tr>
+</thead>
+
+<tbody id="tbody"></tbody>
+
+</table>
+
+</div>
+
+</div>
+<script type="module">
+
+import { initializeApp }
+from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+
+import {
+    getFirestore,
+    doc,
+    setDoc,
+    getDoc,
+    getDocs,
+    collection,
+    deleteDoc
+}
+from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCm86UodpOlSZKR0qCjo37TiujgvnfeWOA",
+  authDomain: "mortalidade-semanal.firebaseapp.com",
+  projectId: "mortalidade-semanal",
+  storageBucket: "mortalidade-semanal.firebasestorage.app",
+  messagingSenderId: "104762865143",
+  appId: "1:104762865143:web:a165dc839ba9d40de5eaf2",
+  measurementId: "G-0N64K4SYZD"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+let timerAutoSave = null;
+
+
+function gerarTabela(){
+
+const tbody = document.getElementById("tbody");
+tbody.innerHTML="";
+
+for(let semana=1; semana<=120; semana++){
+
+let tr=document.createElement("tr");
+
+let html=`
+<td>${semana}</td>
+`;
+
+for(let d=0; d<7; d++){
+
+html+=`
+<td>
+<input
+class="mortalidade"
+type="number"
+min="0"
+value="0"
+oninput="calcular(); autoSalvar();">
+</td>`;
+}
+html+=`
+<td class="periodoSemana">-</td>
+`;
+html+=`
+<td class="semanaTotal">0</td>
+<td class="acumulado">0</td>
+<td class="efetivo">0</td>
+`;
+
+tr.innerHTML=html;
+
+tbody.appendChild(tr);
+
+}
+
+}
+
+function calcular(){
+
+let avesInicial =
+Number(document.getElementById("avesInicial").value) || 0;
+
+let linhas =
+document.querySelectorAll("#tbody tr");
+
+let acumulado=0;
+
+linhas.forEach(linha=>{
+
+let inputs =
+linha.querySelectorAll("input");
+
+let soma=0;
+
+inputs.forEach(i=>{
+soma+=Number(i.value)||0;
+});
+
+acumulado+=soma;
+
+linha.querySelector(".semanaTotal").innerText=soma;
+linha.querySelector(".acumulado").innerText=acumulado;
+linha.querySelector(".efetivo").innerText=
+avesInicial-acumulado;
+
+});
+
+}
+
+function atualizarDatasSemanas() {
+
+    const nascimento = document.getElementById("nascimento").value;
+
+    if (!nascimento) return;
+
+    // Evita problemas de fuso horário
+    const [ano, mes, dia] = nascimento.split("-").map(Number);
+    const dataBase = new Date(ano, mes - 1, dia);
+
+    // Atualiza automaticamente os cabeçalhos da tabela
+    const nomesDias = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
+    const diaInicial = dataBase.getDay();
+
+    const ths = document.querySelectorAll("#tabela thead th");
+
+    // ths[0] = "SEMANA", então começamos no índice 1
+    for (let i = 0; i < 7; i++) {
+        ths[i + 1].textContent = nomesDias[(diaInicial + i) % 7];
+    }
+
+    const linhas = document.querySelectorAll("#tbody tr");
+
+    linhas.forEach((linha, index) => {
+
+        const inicio = new Date(dataBase);
+        inicio.setDate(dataBase.getDate() + (index * 7));
+
+        const fim = new Date(inicio);
+        fim.setDate(inicio.getDate() + 6);
+
+        const formatar = data =>
+            data.toLocaleDateString("pt-BR");
+
+        // Tooltip com os dias corretos
+        let tooltip = "";
+
+        for (let i = 0; i < 7; i++) {
+            const data = new Date(inicio);
+            data.setDate(inicio.getDate() + i);
+
+            tooltip +=
+                `${nomesDias[data.getDay()]}: ${formatar(data)}\n`;
+        }
+
+        const periodo = linha.querySelector(".periodoSemana");
+
+        periodo.innerText =
+            `${formatar(inicio)} até ${formatar(fim)}`;
+
+        periodo.style.cursor = "pointer";
+
+
+        periodo.onclick = () => {
+
+            document.querySelectorAll("#tbody tr").forEach(tr => {
+                tr.classList.remove("linhaSelecionada");
+            });
+
+            linha.classList.add("linhaSelecionada");
+
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    abrirModal(tooltip);
+                });
+            });
+
+        };
+
+
+
+
+    });
+}
+
+
+
+function atualizarIdade(){
+
+let nasc =
+document.getElementById("nascimento").value;
+
+if(!nasc) return;
+
+let hoje = new Date();
+
+let dataNasc = new Date(nasc);
+
+let dias =
+Math.floor(
+(hoje-dataNasc)/(1000*60*60*24)
+);
+
+let idade="";
+
+if(dias<=105){
+
+idade=dias+" dias";
+
+}else{
+
+idade=
+Math.floor(dias/7)+
+" semanas e "+
+(dias%7)+" dias";
+
+}
+
+document.getElementById("idade").value=idade;
+
+let fase="";
+
+if(dias<=42){
+
+fase="CRIA";
+
+}else if(dias<=70){
+
+fase="RECRIA";
+
+}else if(dias<=105){
+
+fase="MATURIDADE";
+
+}else if(dias<=106){
+
+fase="PRÉ-POSTURA";
+
+}else if(dias<=273){
+
+fase="POSTURA 1";
+
+}else if(dias<=413){
+
+fase="POSTURA 2";
+
+}else if(dias<=553){
+
+fase="POSTURA 3";
+
+}else{
+
+fase="POSTURA 4";
+
+}
+
+document.getElementById("fase").value=fase;
+
+}
+
+setInterval(atualizarIdade,1000);
+function autoSalvar() {
+
+    clearTimeout(timerAutoSave);
+
+    timerAutoSave = setTimeout(() => {
+
+        // Só salva se já existir um nome de lote
+        if (document.getElementById("galpao").value.trim() !== "") {
+            salvarLote(true);
+        }
+
+    }, 300); 
+
+}
+async function salvarLote(auto = false){
+
+    const nome = document.getElementById("galpao").value.trim();
+
+    if (!nome) {
+        alert("Informe o Nº GALPÃO / LOTE.");
+        document.getElementById("galpao").focus();
+        return;
+    }
+
+    if(!document.getElementById("produtor").value){
+        alert("Informe o produtor");
+        return;
+    }
+
+    if(!document.getElementById("nascimento").value){
+        alert("Informe a data de nascimento");
+        return;
+    }
+
+    try{
+
+        let dados = {
+
+            produtor: document.getElementById("produtor").value,
+            nascimento: document.getElementById("nascimento").value,
+            galpao: document.getElementById("galpao").value,
+            avesInicial: document.getElementById("avesInicial").value,
+            gta: document.getElementById("gta").value,
+            mortalidade:{}
+        };
+
+        let semanaNumero = 1;
+
+        document
+        .querySelectorAll("#tbody tr")
+        .forEach(linha=>{
+
+            let arr=[];
+
+            linha.querySelectorAll("input")
+            .forEach(inp=>{
+
+                arr.push(Number(inp.value) || 0);
+
+            });
+
+            dados.mortalidade["semana_" + semanaNumero] = {
+
+                qui: arr[0],
+                sex: arr[1],
+                sab: arr[2],
+                dom: arr[3],
+                seg: arr[4],
+                ter: arr[5],
+                qua: arr[6]
+
+            };
+
+            semanaNumero++;
+
+        });
+
+        await setDoc(
+            doc(db,"lotes",nome),
+            dados
+        );
+
+        if (!auto) {
+            alert("Salvo no Firestore");
+        }
+
+        if (!auto) {
+            alert("Salvo no Firestore");
+
+            await carregarLista();
+            document.getElementById("listaLotes").value = nome;
+            await carregarLote(nome);
+        }
+
+    }catch(error){
+
+        console.error(error);
+
+        alert(
+            "Erro ao salvar:\n\n" +
+            error.message
+        );
+
+    }
+
+}
+
+async function carregarLista(){
+
+    let select =
+    document.getElementById("listaLotes");
+
+    select.innerHTML = "";
+
+    // opção vazia
+    let vazio = document.createElement("option");
+    vazio.value = "";
+    vazio.textContent = "-- Selecione um lote --";
+    select.appendChild(vazio);
+
+    const snapshot =
+    await getDocs(
+        collection(db,"lotes")
+    );
+
+    snapshot.forEach(docItem=>{
+
+        let op =
+        document.createElement("option");
+
+        op.value =
+        docItem.id;
+
+        op.textContent =
+        docItem.id;
+
+        select.appendChild(op);
+
+    });
+
+    select.value = "";
+}
+
+async function carregarLote(nome){
+
+
+    try{
+
+        console.log("Carregando lote:", nome);
+
+        const snap =
+        await getDoc(
+            doc(db,"lotes",nome)
+        );
+
+        if(!snap.exists()){
+
+            alert("Lote não encontrado");
+            return;
+
+        }
+
+        const d = snap.data();
+
+        document.getElementById("produtor").value =
+        d.produtor || "";
+
+        document.getElementById("nascimento").value =
+        d.nascimento || "";
+
+        document.getElementById("galpao").value =
+        d.galpao || "";
+
+        document.getElementById("avesInicial").value =
+        d.avesInicial || "";
+
+        document.getElementById("gta").value =
+        d.gta || "";
+
+        // LIMPA TUDO ANTES
+        document
+        .querySelectorAll(".mortalidade")
+        .forEach(inp=>inp.value=0);
+
+        let linhas =
+        document.querySelectorAll("#tbody tr");
+
+        for(let i=1;i<=120;i++){
+
+            const semana =
+            d.mortalidade?.["semana_"+i];
+
+            if(!semana) continue;
+
+            const inputs =
+            linhas[i-1].querySelectorAll("input");
+
+            inputs[0].value = semana.qui ?? 0;
+            inputs[1].value = semana.sex ?? 0;
+            inputs[2].value = semana.sab ?? 0;
+            inputs[3].value = semana.dom ?? 0;
+            inputs[4].value = semana.seg ?? 0;
+            inputs[5].value = semana.ter ?? 0;
+            inputs[6].value = semana.qua ?? 0;
+        }
+
+        calcular();
+        atualizarIdade();
+        atualizarDatasSemanas();
+
+    }catch(error){
+
+        console.error(error);
+
+        alert(
+            "Erro ao carregar:\n\n" +
+            error.message
+        );
+    }
+}
+
+function novoLote() {
+
+    document.getElementById("produtor").value = "";
+    document.getElementById("nascimento").value = "";
+    document.getElementById("galpao").value = "";
+    document.getElementById("avesInicial").value = "";
+    document.getElementById("gta").value = "";
+    document.getElementById("idade").value = "";
+    document.getElementById("fase").value = "";
+
+    document.querySelectorAll(".mortalidade").forEach(i => {
+        i.value = 0;
+    });
+
+    document.getElementById("listaLotes").value = "";
+
+    calcular();
+}
+
+async function excluirLote() {
+
+    const select = document.getElementById("listaLotes");
+    const nome = select.value;
+
+    if (!nome) {
+        alert("Selecione um lote para excluir.");
+        return;
+    }
+
+    if (!confirm(`Deseja realmente excluir o lote "${nome}"?`)) {
+        return;
+    }
+
+    try {
+
+        await deleteDoc(doc(db, "lotes", nome));
+
+        novoLote();
+
+        await carregarLista();
+
+        // Deixa o select na opção vazia
+        select.value = "";
+
+        alert("Lote excluído com sucesso!");
+
+    } catch (erro) {
+
+        console.error(erro);
+        alert("Erro ao excluir:\n\n" + erro.message);
+
+    }
+}
+function abrirModal(texto) {
+    document.getElementById("textoModal").textContent = texto;
+    document.getElementById("modalDatas").style.display = "block";
+}
+
+function fecharModal() {
+    document.getElementById("modalDatas").style.display = "none";
+}
+
+window.fecharModal = fecharModal;
+document
+.getElementById("listaLotes")
+.addEventListener("change", async e=>{
+
+    if(!e.target.value) return;
+
+    await carregarLote(e.target.value);
+
+});
+
+document
+.getElementById("avesInicial")
+.addEventListener("input",calcular);
+
+document
+.getElementById("nascimento")
+.addEventListener("change",()=>{
+
+    atualizarIdade();
+    atualizarDatasSemanas();
+
+});
+document.getElementById("produtor").addEventListener("input", autoSalvar);
+document.getElementById("galpao").addEventListener("input", autoSalvar);
+document.getElementById("gta").addEventListener("input", autoSalvar);
+document.getElementById("avesInicial").addEventListener("input", autoSalvar);
+
+document.getElementById("nascimento").addEventListener("change", () => {
+    autoSalvar();
+});
+async function iniciar(){
+
+    gerarTabela();
+
+    await carregarLista();
+
+}
+
+iniciar();
+
+window.salvarLote = salvarLote;
+window.novoLote = novoLote;
+window.excluirLote = excluirLote;
+window.carregarLote = carregarLote;
+window.calcular = calcular;
+window.autoSalvar = autoSalvar;
+
+</script>
+<div id="modalDatas" style="
+display:none;
+position:fixed;
+top:50%;
+left:3%;
+transform: translate(-40%, -50%);
+background:white;
+padding:20px;
+border-radius:10px;
+box-shadow:0 0 20px rgba(0,0,0,.3);
+z-index:9999;
+white-space:pre-line;
+">
+    <div id="textoModal"></div>
+    <br>
+    <button onclick="fecharModal()">Fechar</button>
+</div>
+</body>
+</html>
