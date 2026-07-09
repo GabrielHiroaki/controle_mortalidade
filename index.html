@@ -417,7 +417,7 @@ function gerarTabela(){
 const tbody = document.getElementById("tbody");
 tbody.innerHTML="";
 
-for(let semana=1; semana<=120; semana++){
+for(let semana=1; semana<=200; semana++){
 
 let tr=document.createElement("tr");
 
@@ -859,7 +859,7 @@ async function carregarLote(nome){
         let linhas =
         document.querySelectorAll("#tbody tr");
 
-        for(let i=1;i<=120;i++){
+        for(let i=1;i<=200;i++){
 
             const semana =
             d.mortalidade?.["semana_"+i];
