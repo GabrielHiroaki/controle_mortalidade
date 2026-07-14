@@ -549,9 +549,7 @@ if(numeroSemana == semanaInicial){
     acumulado = 0;
 
     linha.querySelector(".acumulado").innerText = 0;
-    efetivoAtual = avesInicial;
-    
-    linha.querySelector(".efetivo").value = efetivoAtual;
+    linha.querySelector(".efetivo").value = "";
 
     return;
 }
@@ -1155,6 +1153,7 @@ window.carregarLote = carregarLote;
 window.calcular = calcular;
 window.autoSalvar = autoSalvar;
 window.selecionarSemanaInicial = selecionarSemanaInicial;
+window.ajustarEfetivo = ajustarEfetivo;
 
 </script>
 <div id="modalDatas" style="
