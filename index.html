@@ -510,18 +510,44 @@ inputs.forEach(i=>{
 
 });
 
-linha.querySelector(".semanaTotal").innerText=soma;
+linha.querySelector(".semanaTotal").innerText = soma;
 
-if(semanaInicial == 0 || numeroSemana >= semanaInicial){
+// Nenhuma semana selecionada: comportamento normal
+if(semanaInicial == 0){
 
     acumulado += soma;
 
+    linha.querySelector(".acumulado").innerText = acumulado;
+    linha.querySelector(".efetivo").innerText = avesInicial - acumulado;
+
+    return;
 }
 
-linha.querySelector(".acumulado").innerText=acumulado;
+// Semanas anteriores à selecionada
+if(numeroSemana < semanaInicial){
 
-linha.querySelector(".efetivo").innerText=
-avesInicial-acumulado;
+    linha.querySelector(".acumulado").innerText = "-";
+    linha.querySelector(".efetivo").innerText = "-";
+
+    return;
+}
+
+// Semana selecionada = marco zero
+if(numeroSemana == semanaInicial){
+
+    acumulado = 0;
+
+    linha.querySelector(".acumulado").innerText = 0;
+    linha.querySelector(".efetivo").innerText = avesInicial;
+
+    return;
+}
+
+// Da semana seguinte em diante começa a acumular
+acumulado += soma;
+
+linha.querySelector(".acumulado").innerText = acumulado;
+linha.querySelector(".efetivo").innerText = avesInicial - acumulado;
 
 });
 
