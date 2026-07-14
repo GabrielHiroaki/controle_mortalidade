@@ -488,7 +488,7 @@ linhas.forEach((linha,indice)=>{
 const numeroSemana=indice+1;
 
 let inputs =
-linha.querySelectorAll("input");
+linha.querySelectorAll(".mortalidade");
 
 let soma=0;
 
@@ -788,7 +788,7 @@ async function salvarLote(auto = false) {
 
             const arr = [];
 
-            linha.querySelectorAll("input").forEach(inp => {
+            linha.querySelectorAll(".mortalidade").forEach(inp=>{
                 arr.push(Number(inp.value) || 0);
             });
 
@@ -929,7 +929,7 @@ async function carregarLote(nome){
             if(!semana) continue;
 
             const inputs =
-            linhas[i-1].querySelectorAll("input");
+            linhas[i-1].querySelectorAll(".mortalidade");
 
             inputs[0].value = semana.qui ?? 0;
             inputs[1].value = semana.sex ?? 0;
@@ -1093,6 +1093,7 @@ window.excluirLote = excluirLote;
 window.carregarLote = carregarLote;
 window.calcular = calcular;
 window.autoSalvar = autoSalvar;
+window.selecionarSemanaInicial = selecionarSemanaInicial;
 
 </script>
 <div id="modalDatas" style="
