@@ -422,7 +422,7 @@ const db = getFirestore(app);
 let timerAutoSave = null;
 let salvando = false;
 let loteAtual = "";
-let semanaInicial = 1;
+let semanaInicial = 0;
 function gerarTabela(){
 
 const tbody = document.getElementById("tbody");
@@ -512,9 +512,9 @@ inputs.forEach(i=>{
 
 linha.querySelector(".semanaTotal").innerText=soma;
 
-if(numeroSemana>=semanaInicial){
+if(semanaInicial == 0 || numeroSemana >= semanaInicial){
 
-    acumulado+=soma;
+    acumulado += soma;
 
 }
 
@@ -552,7 +552,7 @@ function selecionarSemanaInicial(check, semana){
 
     }else{
 
-        semanaInicial=1;
+        semanaInicial=0;
 
     }
 
@@ -896,7 +896,7 @@ async function carregarLote(nome){
         }
 
         const d = snap.data();
-        semanaInicial = d.semanaInicial || 1;
+        semanaInicial = d.semanaInicial ?? 0;
         loteAtual = nome;
         document.getElementById("produtor").value =
         d.produtor || "";
@@ -978,7 +978,7 @@ async function carregarLote(nome){
 function novoLote() {
     loteAtual = "";
 
-    semanaInicial = 1;
+    semanaInicial = 0;
     
     document
     .querySelectorAll(".inicioLote")
