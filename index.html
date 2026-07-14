@@ -187,6 +187,16 @@ tbody tr:hover td{
     background:#fff4cc !important;
     transition:.2s;
 }
+.inicioLote{
+    width:15px;
+    height:15px;
+    cursor:pointer;
+}
+
+#tbody tr.semanaInicial td{
+    background:#fde68a !important;
+    font-weight:bold;
+}
 @media print {
 
     thead{
@@ -412,6 +422,7 @@ const db = getFirestore(app);
 let timerAutoSave = null;
 let salvando = false;
 let loteAtual = "";
+let semanaInicial = 1;
 function gerarTabela(){
 
 const tbody = document.getElementById("tbody");
@@ -422,7 +433,15 @@ for(let semana=1; semana<=200; semana++){
 let tr=document.createElement("tr");
 
 let html=`
-<td>${semana}</td>
+<td>
+<div style="display:flex;align-items:center;gap:6px;justify-content:center;">
+<input
+type="checkbox"
+class="inicioLote"
+onchange="selecionarSemanaInicial(this,${semana})">
+<span>${semana}</span>
+</div>
+</td>
 `;
 
 for(let d=0; d<7; d++){
@@ -464,7 +483,9 @@ document.querySelectorAll("#tbody tr");
 
 let acumulado=0;
 
-linhas.forEach(linha=>{
+linhas.forEach((linha,indice)=>{
+
+const numeroSemana=indice+1;
 
 let inputs =
 linha.querySelectorAll("input");
@@ -489,17 +510,56 @@ inputs.forEach(i=>{
 
 });
 
-acumulado+=soma;
-
 linha.querySelector(".semanaTotal").innerText=soma;
+
+if(numeroSemana>=semanaInicial){
+
+    acumulado+=soma;
+
+}
+
 linha.querySelector(".acumulado").innerText=acumulado;
+
 linha.querySelector(".efetivo").innerText=
 avesInicial-acumulado;
 
 });
 
 }
+function selecionarSemanaInicial(check, semana){
 
+    document
+    .querySelectorAll(".inicioLote")
+    .forEach(c=>{
+
+        if(c!==check)
+            c.checked=false;
+
+    });
+
+    document
+    .querySelectorAll("#tbody tr")
+    .forEach(tr=>tr.classList.remove("semanaInicial"));
+
+    if(check.checked){
+
+        semanaInicial=semana;
+
+        check
+        .closest("tr")
+        .classList
+        .add("semanaInicial");
+
+    }else{
+
+        semanaInicial=1;
+
+    }
+
+    calcular();
+    autoSalvar();
+
+}
 function atualizarDatasSemanas() {
 
     const nascimento = document.getElementById("nascimento").value;
@@ -716,6 +776,7 @@ async function salvarLote(auto = false) {
             produtor: document.getElementById("produtor").value.trim(),
             nascimento: document.getElementById("nascimento").value,
             galpao: nome,
+            semanaInicial: semanaInicial,
             avesInicial: document.getElementById("avesInicial").value,
             gta: document.getElementById("gta").value.trim(),
             mortalidade: {}
@@ -835,6 +896,7 @@ async function carregarLote(nome){
         }
 
         const d = snap.data();
+        semanaInicial = d.semanaInicial || 1;
         loteAtual = nome;
         document.getElementById("produtor").value =
         d.produtor || "";
@@ -877,7 +939,27 @@ async function carregarLote(nome){
             inputs[5].value = semana.ter ?? 0;
             inputs[6].value = semana.qua ?? 0;
         }
-
+        // Marca o checkbox da semana inicial
+        document
+        .querySelectorAll(".inicioLote")
+        .forEach((c,i)=>{
+        
+            c.checked = (i + 1) == semanaInicial;
+        
+        });
+        
+        // Deixa a linha destacada
+        document
+        .querySelectorAll("#tbody tr")
+        .forEach((tr,i)=>{
+        
+            tr.classList.remove("semanaInicial");
+        
+            if((i + 1) == semanaInicial){
+                tr.classList.add("semanaInicial");
+            }
+        
+        });
         calcular();
         atualizarIdade();
         atualizarDatasSemanas();
@@ -895,6 +977,16 @@ async function carregarLote(nome){
 
 function novoLote() {
     loteAtual = "";
+
+    semanaInicial = 1;
+    
+    document
+    .querySelectorAll(".inicioLote")
+    .forEach(c => c.checked = false);
+    
+    document
+    .querySelectorAll("#tbody tr")
+    .forEach(tr => tr.classList.remove("semanaInicial"));
     document.getElementById("produtor").value = "";
     document.getElementById("nascimento").value = "";
     document.getElementById("galpao").value = "";
