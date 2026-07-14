@@ -578,10 +578,15 @@ function ajustarEfetivo(input){
     const linha = input.closest("tr");
     const semana = [...document.querySelectorAll("#tbody tr")].indexOf(linha)+1;
 
-    ajustesEfetivo[semana] = Number(input.value) || 0;
-
+    const valor = input.value.trim();
+    
+    if(valor === ""){
+        delete ajustesEfetivo[semana];
+    }else{
+        ajustesEfetivo[semana] = Number(valor);
+    }
+    
     calcular();
-
     autoSalvar();
 
 }
@@ -838,6 +843,7 @@ async function salvarLote(auto = false) {
             semanaInicial: semanaInicial,
             avesInicial: document.getElementById("avesInicial").value,
             gta: document.getElementById("gta").value.trim(),
+            ajustesEfetivo: ajustesEfetivo,
             mortalidade: {}
         };
 
@@ -956,6 +962,7 @@ async function carregarLote(nome){
 
         const d = snap.data();
         semanaInicial = d.semanaInicial ?? 0;
+        ajustesEfetivo = d.ajustesEfetivo ?? {};
         loteAtual = nome;
         document.getElementById("produtor").value =
         d.produtor || "";
@@ -1038,6 +1045,7 @@ function novoLote() {
     loteAtual = "";
 
     semanaInicial = 0;
+    ajustesEfetivo = {};
     
     document
     .querySelectorAll(".inicioLote")
