@@ -549,23 +549,33 @@ if(numeroSemana == semanaInicial){
     acumulado = 0;
 
     linha.querySelector(".acumulado").innerText = 0;
-    linha.querySelector(".efetivo").value = "";
+    if(numeroSemana == semanaInicial){
+    
+        acumulado = 0;
+    
+        linha.querySelector(".acumulado").innerText = 0;
+    
+        if(ajustesEfetivo[numeroSemana] !== undefined){
+            efetivoAtual = ajustesEfetivo[numeroSemana];
+            linha.querySelector(".efetivo").value = efetivoAtual;
+        }else{
+            linha.querySelector(".efetivo").value = "";
+        }
+    
+        return;
+    }
 
-    return;
-}
-
-// Somente depois da semana marcada começa a contar
+// Soma mortes da semana
 acumulado += soma;
 
-// desconta do efetivo atual
-efetivoAtual -= soma;
-
-// existe ajuste manual?
-if(ajustesEfetivo[numeroSemana] !== undefined){
-
+// Se existe ajuste manual nesta semana,
+// ele passa a ser o efetivo inicial da semana
+if (ajustesEfetivo[numeroSemana] !== undefined) {
     efetivoAtual = ajustesEfetivo[numeroSemana];
-
 }
+
+// Agora desconta as mortes desta semana
+efetivoAtual -= soma;
 
 linha.querySelector(".acumulado").innerText = acumulado;
 linha.querySelector(".efetivo").value = efetivoAtual;
