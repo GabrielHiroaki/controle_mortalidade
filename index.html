@@ -423,6 +423,7 @@ let timerAutoSave = null;
 let salvando = false;
 let loteAtual = "";
 let semanaInicial = 0;
+let ajustesEfetivo = {};
 function gerarTabela(){
 
 const tbody = document.getElementById("tbody");
@@ -462,7 +463,13 @@ html+=`
 html+=`
 <td class="semanaTotal">0</td>
 <td class="acumulado">0</td>
-<td class="efetivo">0</td>
+<td>
+<input
+class="efetivo"
+type="number"
+value="0"
+onchange="ajustarEfetivo(this)">
+</td>
 `;
 
 tr.innerHTML=html;
@@ -481,7 +488,9 @@ Number(document.getElementById("avesInicial").value) || 0;
 let linhas =
 document.querySelectorAll("#tbody tr");
 
-let acumulado=0;
+let acumulado = 0;
+
+let efetivoAtual = avesInicial;
 
 linhas.forEach((linha,indice)=>{
 
@@ -518,7 +527,9 @@ if(semanaInicial == 0){
     acumulado += soma;
 
     linha.querySelector(".acumulado").innerText = acumulado;
-    linha.querySelector(".efetivo").innerText = avesInicial - acumulado;
+    efetivoAtual -= soma;
+    
+    linha.querySelector(".efetivo").value = efetivoAtual;
 
     return;
 }
@@ -538,18 +549,42 @@ if(numeroSemana == semanaInicial){
     acumulado = 0;
 
     linha.querySelector(".acumulado").innerText = 0;
-    linha.querySelector(".efetivo").innerText = avesInicial;
+    efetivoAtual = avesInicial;
+    
+    linha.querySelector(".efetivo").value = efetivoAtual;
 
     return;
 }
 
-// Da semana seguinte em diante começa a acumular
+// Somente depois da semana marcada começa a contar
 acumulado += soma;
 
+// desconta do efetivo atual
+efetivoAtual -= soma;
+
+// existe ajuste manual?
+if(ajustesEfetivo[numeroSemana] !== undefined){
+
+    efetivoAtual = ajustesEfetivo[numeroSemana];
+
+}
+
 linha.querySelector(".acumulado").innerText = acumulado;
-linha.querySelector(".efetivo").innerText = avesInicial - acumulado;
+linha.querySelector(".efetivo").value = efetivoAtual;
 
 });
+
+}
+function ajustarEfetivo(input){
+
+    const linha = input.closest("tr");
+    const semana = [...document.querySelectorAll("#tbody tr")].indexOf(linha)+1;
+
+    ajustesEfetivo[semana] = Number(input.value) || 0;
+
+    calcular();
+
+    autoSalvar();
 
 }
 function selecionarSemanaInicial(check, semana){
