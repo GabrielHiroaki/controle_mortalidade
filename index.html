@@ -112,6 +112,136 @@ button:nth-of-type(3){
     background:#dc2626;
 }
 
+.btn-exportar{
+    background:#7c3aed;
+}
+
+.btn-importar{
+    background:#f59e0b;
+}
+
+.btn-detalhamento{
+    background:#0891b2;
+    width:100%;
+    height:44px;
+    align-self:flex-end;
+}
+
+.modal-overlay{
+    display:none;
+    position:fixed;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    background:rgba(15,23,42,.55);
+    z-index:9998;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+}
+
+.modal-box{
+    background:#fff;
+    border-radius:16px;
+    padding:26px;
+    max-width:900px;
+    width:100%;
+    max-height:90vh;
+    overflow-y:auto;
+    box-shadow:0 20px 50px rgba(0,0,0,.3);
+}
+
+.modal-box h2{
+    color:#1e3a8a;
+    margin-bottom:4px;
+    font-size:20px;
+}
+
+.modal-box .subtitulo{
+    color:#555;
+    font-size:14px;
+    margin-bottom:18px;
+}
+
+.form-ovos{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+    align-items:flex-end;
+    background:#f1f5f9;
+    padding:16px;
+    border-radius:12px;
+    margin-bottom:20px;
+}
+
+.form-ovos > div{
+    display:flex;
+    flex-direction:column;
+    min-width:150px;
+}
+
+.form-ovos label{
+    font-size:12px;
+    font-weight:700;
+    color:#555;
+    margin-bottom:4px;
+}
+
+.efetivo-box{
+    background:#dcfce7;
+    color:#166534;
+    font-weight:bold;
+    padding:10px 16px;
+    border-radius:10px;
+    font-size:14px;
+}
+
+.tabela-ovos{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:10px;
+    font-size:13px;
+}
+
+.tabela-ovos th{
+    background:#1e40af;
+    color:#fff;
+    padding:8px;
+}
+
+.tabela-ovos td{
+    border:1px solid #e2e8f0;
+    padding:8px;
+    text-align:center;
+}
+
+.tabela-ovos tr:nth-child(even){
+    background:#f8fafc;
+}
+
+.status-ok{
+    color:#166534;
+    font-weight:bold;
+}
+
+.status-baixo{
+    color:#b91c1c;
+    font-weight:bold;
+}
+
+.grafico-container{
+    margin-top:20px;
+    background:#f8fafc;
+    border-radius:12px;
+    padding:16px;
+}
+
+.btn-fechar-modal{
+    background:#475569;
+    margin-top:16px;
+}
+
 table{
     width:100%;
     border-collapse:collapse;
@@ -316,6 +446,12 @@ tbody tr:hover td{
 
         <button onclick="excluirLote()">🗑 Excluir</button>
 
+        <button class="btn-exportar" onclick="exportarBackup()">📤 Exportar Backup</button>
+
+        <button class="btn-importar" onclick="document.getElementById('inputImportar').click()">📥 Importar Backup</button>
+
+        <input type="file" id="inputImportar" accept="application/json" style="display:none">
+
     </div>
 
 </div>
@@ -357,6 +493,10 @@ tbody tr:hover td{
 <div>
 <label class="info">FASE</label><br>
 <input id="fase" readonly style="width:95%">
+</div>
+
+<div>
+<button class="btn-detalhamento" onclick="abrirDetalhamento()">📊 Detalhamento</button>
 </div>
 
 </div>
@@ -424,6 +564,7 @@ let salvando = false;
 let loteAtual = "";
 let semanaInicial = 0;
 let ajustesEfetivo = {};
+let producaoOvos = {};
 function gerarTabela(){
 
 const tbody = document.getElementById("tbody");
@@ -868,6 +1009,7 @@ async function salvarLote(auto = false) {
             avesInicial: document.getElementById("avesInicial").value,
             gta: document.getElementById("gta").value.trim(),
             ajustesEfetivo: ajustesEfetivo,
+            producaoOvos: producaoOvos,
             mortalidade: {}
         };
 
@@ -987,6 +1129,7 @@ async function carregarLote(nome){
         const d = snap.data();
         semanaInicial = d.semanaInicial ?? 0;
         ajustesEfetivo = d.ajustesEfetivo ?? {};
+        producaoOvos = d.producaoOvos ?? {};
         loteAtual = nome;
         document.getElementById("produtor").value =
         d.produtor || "";
@@ -1070,6 +1213,7 @@ function novoLote() {
 
     semanaInicial = 0;
     ajustesEfetivo = {};
+    producaoOvos = {};
     
     document
     .querySelectorAll(".inicioLote")
@@ -1129,6 +1273,613 @@ async function excluirLote() {
 
     }
 }
+
+// =============================
+// EXPORTAR BACKUP
+// =============================
+async function exportarBackup() {
+
+    try {
+
+        const snapshot = await getDocs(collection(db, "lotes"));
+
+        if (snapshot.empty) {
+            alert("Não há lotes salvos para exportar.");
+            return;
+        }
+
+        const backup = {};
+
+        snapshot.forEach(docItem => {
+            backup[docItem.id] = docItem.data();
+        });
+
+        const conteudo = JSON.stringify(backup, null, 2);
+
+        const blob = new Blob([conteudo], { type: "application/json" });
+
+        const url = URL.createObjectURL(blob);
+
+        const dataHoje = new Date()
+            .toISOString()
+            .slice(0, 10);
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `backup_mortalidade_${dataHoje}.json`;
+
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        URL.revokeObjectURL(url);
+
+    } catch (error) {
+
+        console.error(error);
+        alert("Erro ao exportar backup:\n\n" + error.message);
+
+    }
+}
+
+// =============================
+// IMPORTAR BACKUP
+// =============================
+async function importarBackup(event) {
+
+    const arquivo = event.target.files[0];
+
+    if (!arquivo) return;
+
+    try {
+
+        const texto = await arquivo.text();
+        const dados = JSON.parse(texto);
+
+        const nomes = Object.keys(dados);
+
+        if (nomes.length === 0) {
+            alert("Arquivo de backup vazio ou inválido.");
+            return;
+        }
+
+        const confirmar = confirm(
+            `Foram encontrados ${nomes.length} lote(s) no arquivo.\n\n` +
+            `Lotes com o mesmo nome já existentes serão sobrescritos.\n\n` +
+            `Deseja continuar com a importação?`
+        );
+
+        if (!confirmar) return;
+
+        for (const nome of nomes) {
+            await setDoc(doc(db, "lotes", nome), dados[nome]);
+        }
+
+        await carregarLista();
+
+        alert("Backup importado com sucesso!");
+
+    } catch (error) {
+
+        console.error(error);
+        alert("Erro ao importar backup:\n\n" + error.message);
+
+    } finally {
+
+        // Permite selecionar o mesmo arquivo novamente depois
+        event.target.value = "";
+
+    }
+}
+
+// =============================
+// EFETIVO DE AVES EM UMA DATA ESPECÍFICA
+// =============================
+function parseDataLocal(dataISO){
+    const [ano, mes, dia] = dataISO.split("-").map(Number);
+    return new Date(ano, mes - 1, dia);
+}
+
+function obterEfetivoAtual(dataReferenciaISO){
+
+    // Garante que a tabela está recalculada antes de ler os valores
+    calcular();
+
+    const nascimento = document.getElementById("nascimento").value;
+
+    if(!nascimento) return null;
+
+    const avesInicial =
+    Number(document.getElementById("avesInicial").value) || 0;
+
+    const dataBase = parseDataLocal(nascimento);
+    dataBase.setHours(0,0,0,0);
+
+    const dataReferencia =
+        dataReferenciaISO ? parseDataLocal(dataReferenciaISO) : new Date();
+
+    dataReferencia.setHours(0,0,0,0);
+
+    const diffDias = Math.floor((dataReferencia - dataBase) / (1000*60*60*24));
+
+    if(diffDias < 0) return avesInicial;
+
+    const semanaAtual = Math.floor(diffDias / 7) + 1;
+    const diaNaSemana = diffDias % 7;
+
+    const linhas = document.querySelectorAll("#tbody tr");
+
+    if(semanaAtual > linhas.length) return null;
+
+    const linhaAtual = linhas[semanaAtual - 1];
+
+    let efetivoInicio;
+
+    if(semanaAtual === 1){
+
+        efetivoInicio = avesInicial;
+
+    }else{
+
+        const linhaAnterior = linhas[semanaAtual - 2];
+        const valorAnterior = linhaAnterior.querySelector(".efetivo").value;
+
+        efetivoInicio =
+        valorAnterior !== "" ? Number(valorAnterior) : avesInicial;
+
+    }
+
+    if(ajustesEfetivo[semanaAtual] !== undefined){
+        efetivoInicio = ajustesEfetivo[semanaAtual];
+    }
+
+    const inputsMortalidade =
+    linhaAtual.querySelectorAll(".mortalidade");
+
+    let mortesAteData = 0;
+
+    for(let i=0; i<=diaNaSemana; i++){
+        mortesAteData += Number(inputsMortalidade[i].value) || 0;
+    }
+
+    return efetivoInicio - mortesAteData;
+
+}
+
+function formatarDataBR(dataISO){
+    const [a,m,d] = dataISO.split("-");
+    return `${d}/${m}/${a}`;
+}
+
+function obterDataLocalISO(data = new Date()){
+    const ano = data.getFullYear();
+    const mes = String(data.getMonth()+1).padStart(2,"0");
+    const dia = String(data.getDate()).padStart(2,"0");
+    return `${ano}-${mes}-${dia}`;
+}
+
+// =============================
+// ABRIR / FECHAR MODAL DETALHAMENTO
+// =============================
+function abrirDetalhamento(){
+
+    if(!loteAtual){
+        alert("Salve o lote antes de acessar o detalhamento de produção.");
+        return;
+    }
+
+    document.getElementById("tituloDetalhamento").textContent =
+        `Detalhamento de Produção — Galpão ${document.getElementById("galpao").value} — ${document.getElementById("produtor").value}`;
+
+    document.getElementById("dataOvos").value =
+        obterDataLocalISO();
+
+    document.getElementById("ovosQtd").value = "";
+
+    document.getElementById("filtroDataInicio").value = "";
+    document.getElementById("filtroDataFim").value = "";
+
+    atualizarEfetivoParaData();
+
+    document.getElementById("modalDetalhamento").style.display = "flex";
+
+    renderizarDetalhamento();
+
+}
+
+function atualizarEfetivoParaData(){
+
+    const dataSelecionada = document.getElementById("dataOvos").value;
+
+    if(!dataSelecionada){
+        document.getElementById("efetivoAtualTexto").textContent = "-";
+        return;
+    }
+
+    const efetivo = obterEfetivoAtual(dataSelecionada);
+
+    document.getElementById("efetivoAtualTexto").textContent =
+        efetivo !== null
+        ? `${efetivo} aves (em ${formatarDataBR(dataSelecionada)})`
+        : "não foi possível calcular (verifique nascimento/aves inicial)";
+
+}
+
+function fecharDetalhamento(){
+    document.getElementById("modalDetalhamento").style.display = "none";
+}
+
+// =============================
+// SALVAR REGISTRO DE OVOS DO DIA
+// =============================
+async function salvarRegistroOvos(){
+
+    if(!loteAtual){
+        alert("Selecione ou salve um lote primeiro.");
+        return;
+    }
+
+    const data = document.getElementById("dataOvos").value;
+    const ovos = Number(document.getElementById("ovosQtd").value);
+
+    if(!data){
+        alert("Informe a data.");
+        return;
+    }
+
+    if(!ovos || ovos <= 0){
+        alert("Informe a quantidade de ovos produzidos.");
+        return;
+    }
+
+    const efetivo = obterEfetivoAtual(data);
+
+    if(!efetivo || efetivo <= 0){
+        alert("Não foi possível calcular o efetivo de aves para essa data. Verifique a data de nascimento e o nº de aves inicial.");
+        return;
+    }
+
+    const percentual = (ovos / efetivo) * 100;
+
+    const datasAnteriores =
+        Object.keys(producaoOvos)
+        .filter(d => d < data)
+        .sort();
+
+    const percentualAnterior =
+        datasAnteriores.length
+        ? producaoOvos[datasAnteriores[datasAnteriores.length - 1]].percentual
+        : null;
+
+    producaoOvos[data] = { ovos, efetivo, percentual };
+
+    try{
+
+        await setDoc(
+            doc(db, "lotes", loteAtual),
+            { producaoOvos },
+            { merge:true }
+        );
+
+    }catch(error){
+
+        console.error(error);
+        alert("Erro ao salvar registro:\n\n" + error.message);
+        return;
+
+    }
+
+    let aviso =
+        `Registro salvo!\n\n` +
+        `Ovos: ${ovos}\n` +
+        `Aves efetivas: ${efetivo}\n` +
+        `Percentual: ${percentual.toFixed(1)}%\n\n`;
+
+    if(percentual < 80){
+        aviso += "⚠️ ATENÇÃO: a produção está ABAIXO da meta mínima de 80%.\n";
+    }else{
+        aviso += "✅ Produção dentro da meta (≥80%).\n";
+    }
+
+    if(percentualAnterior !== null){
+
+        const diferenca = percentual - percentualAnterior;
+
+        if(diferenca > 0.05){
+            aviso += `🔼 O percentual SUBIU ${diferenca.toFixed(1)} ponto(s) percentual(is) em relação ao último registro.`;
+        }else if(diferenca < -0.05){
+            aviso += `🔽 O percentual CAIU ${Math.abs(diferenca).toFixed(1)} ponto(s) percentual(is) em relação ao último registro.`;
+        }else{
+            aviso += "➡️ O percentual ficou estável em relação ao último registro.";
+        }
+
+    }
+
+    alert(aviso);
+
+    document.getElementById("ovosQtd").value = "";
+
+    renderizarDetalhamento();
+
+}
+
+// =============================
+// EXCLUIR REGISTRO DE OVOS
+// =============================
+async function excluirRegistroOvos(data){
+
+    if(!loteAtual){
+        alert("Nenhum lote carregado.");
+        return;
+    }
+
+    if(!confirm(`Deseja realmente excluir o registro do dia ${formatarDataBR(data)}?`)){
+        return;
+    }
+
+    delete producaoOvos[data];
+
+    try{
+
+        await setDoc(
+            doc(db, "lotes", loteAtual),
+            { producaoOvos },
+            { merge:true }
+        );
+
+    }catch(error){
+
+        console.error(error);
+        alert("Erro ao excluir registro:\n\n" + error.message);
+        return;
+
+    }
+
+    renderizarDetalhamento();
+
+}
+
+// =============================
+// RENDERIZAR TUDO (GRÁFICO + HISTÓRICO)
+// =============================
+function renderizarDetalhamento(){
+    renderizarGraficoOvos();
+    renderizarHistoricoOvos();
+}
+
+// =============================
+// GRÁFICO COM FILTRO DE PERÍODO
+// =============================
+function limparFiltroGrafico(){
+    document.getElementById("filtroDataInicio").value = "";
+    document.getElementById("filtroDataFim").value = "";
+    renderizarGraficoOvos();
+}
+
+function renderizarGraficoOvos(){
+
+    const inicio = document.getElementById("filtroDataInicio").value;
+    const fim = document.getElementById("filtroDataFim").value;
+
+    let datas = Object.keys(producaoOvos).sort();
+
+    if(inicio){
+        datas = datas.filter(d => d >= inicio);
+    }
+
+    if(fim){
+        datas = datas.filter(d => d <= fim);
+    }
+
+    const labels = datas.map(d => formatarDataBR(d));
+    const valores = datas.map(d => Number(producaoOvos[d].percentual.toFixed(1)));
+
+    const elGrafico = document.getElementById("graficoOvos");
+    const larguraDisponivel = elGrafico.clientWidth || 800;
+
+    elGrafico.innerHTML =
+        gerarGraficoSVG(labels, valores, larguraDisponivel);
+
+}
+
+// =============================
+// HISTÓRICO AGRUPADO POR MÊS (RECOLHÍVEL)
+// =============================
+function renderizarHistoricoOvos(){
+
+    const datasOrdenadas = Object.keys(producaoOvos).sort();
+
+    const container = document.getElementById("containerHistorico");
+
+    if(datasOrdenadas.length === 0){
+        container.innerHTML =
+            `<p style="text-align:center;color:#94a3b8;padding:20px;">Nenhum registro ainda</p>`;
+        return;
+    }
+
+    // Calcula tendência em ordem cronológica (independente do agrupamento)
+    const tendencias = {};
+    let anterior = null;
+
+    datasOrdenadas.forEach(data => {
+
+        const reg = producaoOvos[data];
+        let tendencia = "—";
+
+        if(anterior !== null){
+            if(reg.percentual > anterior + 0.05) tendencia = "🔼 Subiu";
+            else if(reg.percentual < anterior - 0.05) tendencia = "🔽 Caiu";
+            else tendencia = "➡️ Estável";
+        }
+
+        tendencias[data] = tendencia;
+        anterior = reg.percentual;
+
+    });
+
+    // Agrupa por mês (YYYY-MM)
+    const grupos = {};
+
+    datasOrdenadas.forEach(data => {
+        const chave = data.slice(0,7);
+        if(!grupos[chave]) grupos[chave] = [];
+        grupos[chave].push(data);
+    });
+
+    const chavesOrdenadas = Object.keys(grupos).sort().reverse();
+
+    const nomesMeses = [
+        "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
+        "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"
+    ];
+
+    let html = "";
+
+    chavesOrdenadas.forEach((chave, indice) => {
+
+        const [ano, mes] = chave.split("-").map(Number);
+        const nomeMes = `${nomesMeses[mes-1]} de ${ano}`;
+
+        const registrosMes = grupos[chave].slice().sort().reverse();
+
+        const media =
+            grupos[chave].reduce((soma,d)=>soma+producaoOvos[d].percentual,0) / grupos[chave].length;
+
+        let linhasHtml = "";
+
+        registrosMes.forEach(data => {
+
+            const reg = producaoOvos[data];
+
+            const statusClass = reg.percentual >= 80 ? "status-ok" : "status-baixo";
+            const statusTexto = reg.percentual >= 80 ? "✅ Dentro da meta" : "⚠️ Abaixo da meta";
+
+            linhasHtml += `
+            <tr>
+                <td>${formatarDataBR(data)}</td>
+                <td>${reg.ovos}</td>
+                <td>${reg.efetivo}</td>
+                <td>${reg.percentual.toFixed(1)}%</td>
+                <td class="${statusClass}">${statusTexto}</td>
+                <td>${tendencias[data]}</td>
+                <td><button onclick="excluirRegistroOvos('${data}')" style="background:#dc2626;padding:6px 10px;font-size:12px;margin:0;">🗑 Excluir</button></td>
+            </tr>`;
+
+        });
+
+        html += `
+        <details ${indice === 0 ? "open" : ""} style="margin-bottom:10px;border:1px solid #cbd5e1;border-radius:10px;overflow:hidden;">
+            <summary style="cursor:pointer;background:#1e40af;color:#fff;padding:10px 14px;font-weight:bold;">
+                📅 ${nomeMes} — ${grupos[chave].length} registro${grupos[chave].length > 1 ? "s" : ""} — média ${media.toFixed(1)}%
+            </summary>
+            <table class="tabela-ovos" style="margin-top:0;border:none;border-radius:0;">
+                <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Ovos</th>
+                    <th>Aves Efetivas</th>
+                    <th>%</th>
+                    <th>Situação</th>
+                    <th>Tendência</th>
+                    <th>Ação</th>
+                </tr>
+                </thead>
+                <tbody>${linhasHtml}</tbody>
+            </table>
+        </details>`;
+
+    });
+
+    container.innerHTML = html;
+
+}
+
+// =============================
+// GRÁFICO EM SVG PURO (SEM DEPENDÊNCIAS EXTERNAS)
+// =============================
+function gerarGraficoSVG(labels, valores, larguraDisponivel = 800){
+
+    const margem = { top:24, right:30, bottom:60, left:50 };
+    const larguraPorPonto = 70;
+    const alturaGrafico = 260;
+
+    // Largura mínima necessária para os pontos não ficarem colados
+    const larguraMinimaPontos = Math.max(300, labels.length * larguraPorPonto);
+
+    // Largura útil do container (descontando as margens do eixo)
+    const larguraUtilContainer = Math.max(300, larguraDisponivel - margem.left - margem.right);
+
+    // Usa a maior das duas: estica para preencher o card, ou abre scroll se tiver muitos pontos
+    const larguraGrafico = Math.max(larguraMinimaPontos, larguraUtilContainer);
+
+    const larguraTotal = larguraGrafico + margem.left + margem.right;
+    const alturaTotal = alturaGrafico + margem.top + margem.bottom;
+
+    const escalaY = v => margem.top + alturaGrafico - (Math.max(0, Math.min(v,100)) / 100) * alturaGrafico;
+
+    const escalaX = i =>
+        margem.left + (labels.length <= 1
+            ? larguraGrafico / 2
+            : i * (larguraGrafico / (labels.length - 1)));
+
+    let svg = `<svg viewBox="0 0 ${larguraTotal} ${alturaTotal}" width="${larguraTotal}" height="${alturaTotal}" xmlns="http://www.w3.org/2000/svg" style="font-family:Arial, sans-serif;">`;
+
+    // grade + rótulos do eixo Y
+    [0,20,40,60,80,100].forEach(v=>{
+
+        const y = escalaY(v);
+
+        svg += `<line x1="${margem.left}" y1="${y}" x2="${margem.left+larguraGrafico}" y2="${y}" stroke="#e2e8f0" stroke-width="1"/>`;
+        svg += `<text x="${margem.left-10}" y="${y+4}" font-size="11" fill="#64748b" text-anchor="end">${v}%</text>`;
+
+    });
+
+    // linha de meta (80%)
+    const y80 = escalaY(80);
+
+    svg += `<line x1="${margem.left}" y1="${y80}" x2="${margem.left+larguraGrafico}" y2="${y80}" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6,6"/>`;
+    svg += `<text x="${margem.left+larguraGrafico}" y="${y80-6}" font-size="11" fill="#b45309" text-anchor="end" font-weight="bold">Meta 80%</text>`;
+
+    // eixo X
+    svg += `<line x1="${margem.left}" y1="${margem.top+alturaGrafico}" x2="${margem.left+larguraGrafico}" y2="${margem.top+alturaGrafico}" stroke="#94a3b8" stroke-width="1.5"/>`;
+
+    if(valores.length > 0){
+
+        const pontos = valores.map((v,i)=> `${escalaX(i)},${escalaY(v)}`).join(" ");
+
+        const areaPontos =
+            `${escalaX(0)},${margem.top+alturaGrafico} ${pontos} ${escalaX(valores.length-1)},${margem.top+alturaGrafico}`;
+
+        svg += `<polygon points="${areaPontos}" fill="rgba(37,99,235,.12)"/>`;
+        svg += `<polyline points="${pontos}" fill="none" stroke="#2563eb" stroke-width="2.5"/>`;
+
+        valores.forEach((v,i)=>{
+
+            const cor = v >= 80 ? "#16a34a" : "#dc2626";
+
+            svg += `<circle cx="${escalaX(i)}" cy="${escalaY(v)}" r="5" fill="${cor}" stroke="#fff" stroke-width="1.5"><title>${labels[i]}: ${v}%</title></circle>`;
+            svg += `<text x="${escalaX(i)}" y="${escalaY(v)-12}" font-size="11" fill="${cor}" text-anchor="middle" font-weight="bold">${v}%</text>`;
+
+        });
+
+        labels.forEach((l,i)=>{
+
+            svg += `<text x="${escalaX(i)}" y="${margem.top+alturaGrafico+18}" font-size="11" fill="#475569" text-anchor="middle" transform="rotate(-40 ${escalaX(i)} ${margem.top+alturaGrafico+18})">${l}</text>`;
+
+        });
+
+    }else{
+
+        svg += `<text x="${larguraTotal/2}" y="${alturaTotal/2}" font-size="14" fill="#94a3b8" text-anchor="middle">Nenhum registro ainda</text>`;
+
+    }
+
+    svg += `</svg>`;
+
+    return svg;
+
+}
+
 function abrirModal(texto) {
     document.getElementById("textoModal").textContent = texto;
     document.getElementById("modalDatas").style.display = "block";
@@ -1168,6 +1919,17 @@ document.getElementById("avesInicial").addEventListener("input", autoSalvar);
 document.getElementById("nascimento").addEventListener("change", () => {
     autoSalvar();
 });
+
+document
+.getElementById("inputImportar")
+.addEventListener("change", importarBackup);
+
+window.addEventListener("resize", () => {
+    if(document.getElementById("modalDetalhamento").style.display === "flex"){
+        renderizarGraficoOvos();
+    }
+});
+
 async function iniciar(){
 
     gerarTabela();
@@ -1186,8 +1948,74 @@ window.calcular = calcular;
 window.autoSalvar = autoSalvar;
 window.selecionarSemanaInicial = selecionarSemanaInicial;
 window.ajustarEfetivo = ajustarEfetivo;
+window.exportarBackup = exportarBackup;
+window.importarBackup = importarBackup;
+window.abrirDetalhamento = abrirDetalhamento;
+window.fecharDetalhamento = fecharDetalhamento;
+window.salvarRegistroOvos = salvarRegistroOvos;
+window.excluirRegistroOvos = excluirRegistroOvos;
+window.atualizarEfetivoParaData = atualizarEfetivoParaData;
+window.renderizarGraficoOvos = renderizarGraficoOvos;
+window.limparFiltroGrafico = limparFiltroGrafico;
 
 </script>
+<div id="modalDetalhamento" class="modal-overlay">
+<div class="modal-box">
+
+    <h2 id="tituloDetalhamento">Detalhamento de Produção</h2>
+    <div class="subtitulo">Compare a produção diária de ovos com o número de aves efetivas da granja.</div>
+
+    <div style="margin-bottom:16px;">
+        <span class="efetivo-box">🐔 Aves efetivas: <span id="efetivoAtualTexto">-</span></span>
+    </div>
+
+    <div class="form-ovos">
+
+        <div>
+            <label>DATA</label>
+            <input type="date" id="dataOvos" onchange="atualizarEfetivoParaData()">
+        </div>
+
+        <div>
+            <label>QTD. DE OVOS PRODUZIDOS</label>
+            <input type="number" min="0" id="ovosQtd" placeholder="Ex: 1980">
+        </div>
+
+        <div>
+            <button onclick="salvarRegistroOvos()" style="background:#16a34a;height:44px;">💾 Salvar Registro</button>
+        </div>
+
+    </div>
+
+    <div class="form-ovos" style="background:#eef2ff;">
+
+        <div>
+            <label>FILTRAR GRÁFICO - DE</label>
+            <input type="date" id="filtroDataInicio" onchange="renderizarGraficoOvos()">
+        </div>
+
+        <div>
+            <label>FILTRAR GRÁFICO - ATÉ</label>
+            <input type="date" id="filtroDataFim" onchange="renderizarGraficoOvos()">
+        </div>
+
+        <div>
+            <button onclick="limparFiltroGrafico()" style="background:#64748b;height:44px;">✖ Limpar filtro</button>
+        </div>
+
+    </div>
+
+    <div class="grafico-container">
+        <div id="graficoOvos" style="width:100%;overflow-x:auto;"></div>
+    </div>
+
+    <div id="containerHistorico"></div>
+
+    <button class="btn-fechar-modal" onclick="fecharDetalhamento()">Fechar</button>
+
+</div>
+</div>
+
 <div id="modalDatas" style="
 display:none;
 position:fixed;
