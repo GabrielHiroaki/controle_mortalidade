@@ -120,8 +120,23 @@ button:nth-of-type(3){
     background:#f59e0b;
 }
 
+.btn-arquivar{
+    background:#92400e;
+}
+
+.btn-arquivados{
+    background:#475569;
+}
+
 .btn-detalhamento{
     background:#0891b2;
+    width:100%;
+    height:44px;
+    align-self:flex-end;
+}
+
+.btn-mensal{
+    background:#0d9488;
     width:100%;
     height:44px;
     align-self:flex-end;
@@ -317,6 +332,12 @@ tbody tr:hover td{
     background:#fff4cc !important;
     transition:.2s;
 }
+input[type="checkbox"]{
+    width:auto;
+    height:auto;
+    padding:0;
+}
+
 .inicioLote{
     width:15px;
     height:15px;
@@ -446,6 +467,10 @@ tbody tr:hover td{
 
         <button onclick="excluirLote()">🗑 Excluir</button>
 
+        <button class="btn-arquivar" onclick="arquivarLote()">🗄 Arquivar Granja</button>
+
+        <button class="btn-arquivados" onclick="abrirArquivados()">📦 Arquivados</button>
+
         <button class="btn-exportar" onclick="exportarBackup()">📤 Exportar Backup</button>
 
         <button class="btn-importar" onclick="document.getElementById('inputImportar').click()">📥 Importar Backup</button>
@@ -497,6 +522,10 @@ tbody tr:hover td{
 
 <div>
 <button class="btn-detalhamento" onclick="abrirDetalhamento()">📊 Detalhamento</button>
+</div>
+
+<div>
+<button class="btn-mensal" onclick="abrirVisaoMensal()">📅 Mensal</button>
 </div>
 
 </div>
@@ -954,6 +983,48 @@ function autoSalvar() {
     }, 1000); 
 
 }
+function montarDadosLoteAtual(nome){
+
+    const dados = {
+        produtor: document.getElementById("produtor").value.trim(),
+        nascimento: document.getElementById("nascimento").value,
+        galpao: nome,
+        semanaInicial: semanaInicial,
+        avesInicial: document.getElementById("avesInicial").value,
+        gta: document.getElementById("gta").value.trim(),
+        ajustesEfetivo: ajustesEfetivo,
+        producaoOvos: producaoOvos,
+        mortalidade: {}
+    };
+
+    let semanaNumero = 1;
+
+    document.querySelectorAll("#tbody tr").forEach(linha => {
+
+        const arr = [];
+
+        linha.querySelectorAll(".mortalidade").forEach(inp=>{
+            arr.push(Number(inp.value) || 0);
+        });
+
+        dados.mortalidade["semana_" + semanaNumero] = {
+            qui: arr[0],
+            sex: arr[1],
+            sab: arr[2],
+            dom: arr[3],
+            seg: arr[4],
+            ter: arr[5],
+            qua: arr[6]
+        };
+
+        semanaNumero++;
+
+    });
+
+    return dados;
+
+}
+
 async function salvarLote(auto = false) {
 
     if (salvando) return;
@@ -1001,41 +1072,7 @@ async function salvarLote(auto = false) {
             return;
         }
 
-        const dados = {
-            produtor: document.getElementById("produtor").value.trim(),
-            nascimento: document.getElementById("nascimento").value,
-            galpao: nome,
-            semanaInicial: semanaInicial,
-            avesInicial: document.getElementById("avesInicial").value,
-            gta: document.getElementById("gta").value.trim(),
-            ajustesEfetivo: ajustesEfetivo,
-            producaoOvos: producaoOvos,
-            mortalidade: {}
-        };
-
-        let semanaNumero = 1;
-
-        document.querySelectorAll("#tbody tr").forEach(linha => {
-
-            const arr = [];
-
-            linha.querySelectorAll(".mortalidade").forEach(inp=>{
-                arr.push(Number(inp.value) || 0);
-            });
-
-            dados.mortalidade["semana_" + semanaNumero] = {
-                qui: arr[0],
-                sex: arr[1],
-                sab: arr[2],
-                dom: arr[3],
-                seg: arr[4],
-                ter: arr[5],
-                qua: arr[6]
-            };
-
-            semanaNumero++;
-
-        });
+        const dados = montarDadosLoteAtual(nome);
 
         await setDoc(doc(db, "lotes", nome), dados);
         
@@ -1090,6 +1127,11 @@ async function carregarLista(){
     );
 
     snapshot.forEach(docItem=>{
+
+        const d = docItem.data();
+
+        // Granjas arquivadas não aparecem na lista principal
+        if(d.arquivado === true) return;
 
         let op =
         document.createElement("option");
@@ -1237,6 +1279,191 @@ function novoLote() {
     document.getElementById("listaLotes").value = "";
 
     calcular();
+}
+
+// =============================
+// ARQUIVAR GRANJA
+// =============================
+async function arquivarLote(){
+
+    if(!loteAtual){
+        alert("Selecione ou salve uma granja antes de arquivar.");
+        return;
+    }
+
+    if(!confirm(
+        `Deseja arquivar a granja "${loteAtual}"?\n\n` +
+        `Ela vai sair da lista principal, mas todos os dados ` +
+        `(mortalidade e produção de ovos) ficam guardados e você ` +
+        `pode restaurar depois. O nome "${loteAtual}" fica livre ` +
+        `para você usar numa granja nova, se precisar.`
+    )){
+        return;
+    }
+
+    try{
+
+        const nomeOriginal = loteAtual;
+
+        // Monta os dados atuais e adiciona as marcações de arquivo.
+        // Usamos um ID interno único (nome + timestamp) para o documento
+        // arquivado, assim o nome/número da granja fica livre para
+        // ser reaproveitado numa granja nova sem conflito nenhum.
+        const dados = montarDadosLoteAtual(nomeOriginal);
+
+        dados.arquivado = true;
+        dados.nomeOriginal = nomeOriginal;
+        dados.dataArquivamento = new Date().toLocaleString("pt-BR");
+
+        const idArquivo = `${nomeOriginal}__ARQ__${Date.now()}`;
+
+        await setDoc(doc(db, "lotes", idArquivo), dados);
+
+        await deleteDoc(doc(db, "lotes", nomeOriginal));
+
+        novoLote();
+
+        await carregarLista();
+
+        alert(`Granja "${nomeOriginal}" arquivada com sucesso!\n\nVocê pode vê-la e restaurá-la a qualquer momento em "📦 Arquivados".`);
+
+    }catch(error){
+
+        console.error(error);
+        alert("Erro ao arquivar:\n\n" + error.message);
+
+    }
+
+}
+
+// =============================
+// VER / RESTAURAR / EXCLUIR ARQUIVADOS
+// =============================
+async function abrirArquivados(){
+
+    try{
+
+        const snapshot = await getDocs(collection(db, "lotes"));
+
+        const arquivados = [];
+
+        snapshot.forEach(docItem => {
+            const d = docItem.data();
+            if(d.arquivado === true){
+                arquivados.push({ id: docItem.id, dados: d });
+            }
+        });
+
+        arquivados.sort((a,b) => (b.dados.dataArquivamento || "").localeCompare(a.dados.dataArquivamento || ""));
+
+        const container = document.getElementById("listaArquivados");
+
+        if(arquivados.length === 0){
+
+            container.innerHTML =
+                `<p style="text-align:center;color:#94a3b8;padding:20px;">Nenhuma granja arquivada ainda.</p>`;
+
+        }else{
+
+            container.innerHTML = arquivados.map(item => `
+                <div style="background:#fff;border:1px solid #cbd5e1;border-radius:12px;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+                    <div>
+                        <div style="font-weight:bold;color:#1e3a8a;">🗄 ${item.dados.nomeOriginal || item.dados.galpao || item.id}</div>
+                        <div style="font-size:13px;color:#555;">${item.dados.produtor || "-"}</div>
+                        <div style="font-size:12px;color:#94a3b8;">Arquivado em ${item.dados.dataArquivamento || "-"}</div>
+                    </div>
+                    <div style="display:flex;gap:8px;">
+                        <button onclick="restaurarLote('${item.id}')" style="background:#16a34a;padding:8px 14px;font-size:13px;margin:0;">♻ Restaurar</button>
+                        <button onclick="excluirArquivadoDefinitivo('${item.id}')" style="background:#dc2626;padding:8px 14px;font-size:13px;margin:0;">🗑 Excluir definitivo</button>
+                    </div>
+                </div>`).join("");
+
+        }
+
+        document.getElementById("modalArquivados").style.display = "flex";
+
+    }catch(error){
+
+        console.error(error);
+        alert("Erro ao carregar arquivados:\n\n" + error.message);
+
+    }
+
+}
+
+function fecharModalArquivados(){
+    document.getElementById("modalArquivados").style.display = "none";
+}
+
+async function restaurarLote(idArquivo){
+
+    try{
+
+        const snap = await getDoc(doc(db, "lotes", idArquivo));
+
+        if(!snap.exists()){
+            alert("Registro arquivado não encontrado.");
+            return;
+        }
+
+        const d = snap.data();
+        const nomeOriginal = d.nomeOriginal || d.galpao || idArquivo;
+
+        // Verifica se já existe uma granja ATIVA usando esse mesmo nome
+        const existeAtiva = await getDoc(doc(db, "lotes", nomeOriginal));
+
+        if(existeAtiva.exists()){
+            alert(
+                `Não é possível restaurar: já existe uma granja ativa chamada "${nomeOriginal}".\n\n` +
+                `Renomeie a granja ativa (ou arquive-a também) antes de restaurar esta.`
+            );
+            return;
+        }
+
+        if(!confirm(`Deseja restaurar a granja "${nomeOriginal}"? Ela volta a aparecer na lista principal.`)){
+            return;
+        }
+
+        const dadosRestaurados = { ...d };
+        delete dadosRestaurados.arquivado;
+        delete dadosRestaurados.nomeOriginal;
+        delete dadosRestaurados.dataArquivamento;
+
+        await setDoc(doc(db, "lotes", nomeOriginal), dadosRestaurados);
+        await deleteDoc(doc(db, "lotes", idArquivo));
+
+        await carregarLista();
+        await abrirArquivados();
+
+        alert(`Granja "${nomeOriginal}" restaurada com sucesso!`);
+
+    }catch(error){
+
+        console.error(error);
+        alert("Erro ao restaurar:\n\n" + error.message);
+
+    }
+
+}
+
+async function excluirArquivadoDefinitivo(idArquivo){
+
+    if(!confirm("Deseja excluir DEFINITIVAMENTE esta granja arquivada? Essa ação não pode ser desfeita.")){
+        return;
+    }
+
+    try{
+
+        await deleteDoc(doc(db, "lotes", idArquivo));
+        await abrirArquivados();
+
+    }catch(error){
+
+        console.error(error);
+        alert("Erro ao excluir definitivamente:\n\n" + error.message);
+
+    }
+
 }
 
 async function excluirLote() {
@@ -1795,6 +2022,36 @@ function renderizarHistoricoOvos(){
 }
 
 // =============================
+// GERA UM CAMINHO SUAVE (CURVA) A PARTIR DE PONTOS
+// =============================
+function gerarPathSuave(pontosXY){
+
+    if(pontosXY.length === 0) return "";
+    if(pontosXY.length === 1) return `M ${pontosXY[0].x} ${pontosXY[0].y}`;
+
+    let d = `M ${pontosXY[0].x} ${pontosXY[0].y}`;
+
+    for(let i=0; i<pontosXY.length-1; i++){
+
+        const p0 = pontosXY[i === 0 ? i : i-1];
+        const p1 = pontosXY[i];
+        const p2 = pontosXY[i+1];
+        const p3 = pontosXY[i+2 < pontosXY.length ? i+2 : i+1];
+
+        const cp1x = p1.x + (p2.x - p0.x) / 6;
+        const cp1y = p1.y + (p2.y - p0.y) / 6;
+        const cp2x = p2.x - (p3.x - p1.x) / 6;
+        const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+        d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+
+    }
+
+    return d;
+
+}
+
+// =============================
 // GRÁFICO EM SVG PURO (SEM DEPENDÊNCIAS EXTERNAS)
 // =============================
 function gerarGraficoSVG(labels, valores, larguraDisponivel = 800){
@@ -1845,13 +2102,15 @@ function gerarGraficoSVG(labels, valores, larguraDisponivel = 800){
 
     if(valores.length > 0){
 
-        const pontos = valores.map((v,i)=> `${escalaX(i)},${escalaY(v)}`).join(" ");
+        const pontosXY = valores.map((v,i)=> ({ x: escalaX(i), y: escalaY(v) }));
 
-        const areaPontos =
-            `${escalaX(0)},${margem.top+alturaGrafico} ${pontos} ${escalaX(valores.length-1)},${margem.top+alturaGrafico}`;
+        const pathSuave = gerarPathSuave(pontosXY);
 
-        svg += `<polygon points="${areaPontos}" fill="rgba(37,99,235,.12)"/>`;
-        svg += `<polyline points="${pontos}" fill="none" stroke="#2563eb" stroke-width="2.5"/>`;
+        const pathArea =
+            `${pathSuave} L ${pontosXY[pontosXY.length-1].x} ${margem.top+alturaGrafico} L ${pontosXY[0].x} ${margem.top+alturaGrafico} Z`;
+
+        svg += `<path d="${pathArea}" fill="rgba(37,99,235,.10)"/>`;
+        svg += `<path d="${pathSuave}" fill="none" stroke="#2563eb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
 
         valores.forEach((v,i)=>{
 
@@ -1880,6 +2139,598 @@ function gerarGraficoSVG(labels, valores, larguraDisponivel = 800){
 
 }
 
+// =============================
+// VISÃO MENSAL - TODAS AS GRANJAS
+// =============================
+let dadosTodosLotes = {};
+let seriesMesAtual = [];
+let chaveMesAtual = null;
+
+const NOMES_MESES = [
+    "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
+    "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"
+];
+
+const CORES_GRANJAS = [
+    "#2563eb","#16a34a","#dc2626","#f59e0b",
+    "#7c3aed","#0891b2","#db2777","#65a30d",
+    "#ea580c","#4f46e5"
+];
+
+async function abrirVisaoMensal(){
+
+    try{
+
+        const snapshot = await getDocs(collection(db, "lotes"));
+
+        dadosTodosLotes = {};
+
+        snapshot.forEach(docItem => {
+
+            const d = docItem.data();
+
+            if(d.arquivado !== true && d.producaoOvos && Object.keys(d.producaoOvos).length > 0){
+
+                dadosTodosLotes[docItem.id] = {
+                    produtor: d.produtor || "",
+                    galpao: d.galpao || docItem.id,
+                    producaoOvos: d.producaoOvos
+                };
+
+            }
+
+        });
+
+    }catch(error){
+
+        console.error(error);
+        alert("Erro ao carregar dados mensais:\n\n" + error.message);
+        return;
+
+    }
+
+    renderizarListaMeses();
+
+    document.getElementById("modalMensal").style.display = "flex";
+
+}
+
+function fecharModalMensal(){
+    document.getElementById("modalMensal").style.display = "none";
+}
+
+function renderizarListaMeses(){
+
+    const mesesSet = new Set();
+
+    Object.values(dadosTodosLotes).forEach(lote => {
+        Object.keys(lote.producaoOvos).forEach(data => {
+            mesesSet.add(data.slice(0,7));
+        });
+    });
+
+    const mesesOrdenados = [...mesesSet].sort().reverse();
+
+    const listaMeses = document.getElementById("listaMeses");
+
+    if(mesesOrdenados.length === 0){
+        listaMeses.innerHTML =
+            `<p style="text-align:center;color:#94a3b8;padding:20px;">Nenhum registro de produção encontrado ainda.</p>`;
+    }else{
+
+        let html = "";
+
+        mesesOrdenados.forEach(chave => {
+
+            const [ano, mes] = chave.split("-").map(Number);
+            const nomeMes = `${NOMES_MESES[mes-1]} de ${ano}`;
+
+            let granjasNoMes = 0;
+            let registrosNoMes = 0;
+
+            Object.values(dadosTodosLotes).forEach(lote => {
+                const diasDoMes = Object.keys(lote.producaoOvos).filter(d => d.startsWith(chave));
+                if(diasDoMes.length > 0){
+                    granjasNoMes++;
+                    registrosNoMes += diasDoMes.length;
+                }
+            });
+
+            html += `
+            <button onclick="abrirMesEspecifico('${chave}')" style="width:100%;text-align:left;background:#fff;border:1px solid #cbd5e1;border-radius:12px;padding:16px;margin-bottom:10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;color:#1e293b;">
+                <span style="font-weight:bold;color:#1e3a8a;">📅 ${nomeMes}</span>
+                <span style="color:#555;font-size:13px;">${granjasNoMes} granja${granjasNoMes>1?"s":""} — ${registrosNoMes} registro${registrosNoMes>1?"s":""} →</span>
+            </button>`;
+
+        });
+
+        listaMeses.innerHTML = html;
+
+    }
+
+    document.getElementById("detalheMesContainer").style.display = "none";
+    document.getElementById("listaMeses").style.display = "block";
+
+}
+
+function voltarListaMeses(){
+    document.getElementById("detalheMesContainer").style.display = "none";
+    document.getElementById("listaMeses").style.display = "block";
+}
+
+function abrirMesEspecifico(chaveMes){
+
+    document.getElementById("listaMeses").style.display = "none";
+
+    const cont = document.getElementById("detalheMesContainer");
+    cont.style.display = "block";
+
+    const [ano, mes] = chaveMes.split("-").map(Number);
+    const nomeMes = `${NOMES_MESES[mes-1]} de ${ano}`;
+
+    const series = [];
+    const resumoLinhas = [];
+    let corIndice = 0;
+
+    Object.values(dadosTodosLotes).forEach(lote => {
+
+        const diasDoMes = Object.keys(lote.producaoOvos).filter(d => d.startsWith(chaveMes)).sort();
+
+        if(diasDoMes.length === 0) return;
+
+        const pontos = diasDoMes.map(d => ({
+            dia: Number(d.slice(8,10)),
+            percentual: lote.producaoOvos[d].percentual
+        }));
+
+        const media = pontos.reduce((s,p)=>s+p.percentual,0) / pontos.length;
+        const cor = CORES_GRANJAS[corIndice % CORES_GRANJAS.length];
+        corIndice++;
+
+        const nomeGranja = `${lote.galpao} — ${lote.produtor}`;
+
+        series.push({ nome: nomeGranja, cor, pontos, media });
+
+        resumoLinhas.push({
+            nome: nomeGranja,
+            media,
+            registros: pontos.length,
+            cor,
+            statusClass: media >= 80 ? "status-ok" : "status-baixo"
+        });
+
+    });
+
+    // Ordena por média (melhor pra pior), igual na tabela
+    series.sort((a,b)=> b.media - a.media);
+    resumoLinhas.sort((a,b)=> b.media - a.media);
+
+    // Guarda para o gráfico poder ser refiltrado sem recarregar tudo
+    seriesMesAtual = series;
+    chaveMesAtual = chaveMes;
+
+    // Por padrão, seleciona só as 5 primeiras para não vir tudo lotado
+    const QTD_PADRAO_SELECIONADAS = 5;
+
+    let checklistHtml = "";
+
+    if(series.length > 0){
+
+        checklistHtml = `
+        <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+            <button onclick="selecionarTodasGranjas()" style="background:#2563eb;padding:7px 12px;font-size:12px;margin:0;">Selecionar todas</button>
+            <button onclick="limparSelecaoGranjas()" style="background:#64748b;padding:7px 12px;font-size:12px;margin:0;">Limpar seleção</button>
+        </div>
+        <div id="checklistGranjas" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px;background:#f1f5f9;padding:10px;border-radius:10px;margin-bottom:16px;max-height:150px;overflow-y:auto;">
+            ${series.map((serie, indice) => `
+                <label title="${serie.nome}" style="display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:5px 8px;cursor:pointer;font-size:12px;line-height:1.2;overflow:hidden;">
+                    <input type="checkbox" class="chk-granja-mes" value="${indice}" ${indice < QTD_PADRAO_SELECIONADAS ? "checked" : ""} onchange="atualizarGraficoComparativo()" style="width:14px;height:14px;min-width:14px;padding:0;border-radius:3px;margin:0;">
+                    <span style="display:inline-block;width:8px;height:8px;min-width:8px;border-radius:50%;background:${serie.cor};"></span>
+                    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${serie.nome}</span>
+                </label>`).join("")}
+        </div>`;
+
+    }
+
+    let html = `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+        <button onclick="voltarListaMeses()" style="background:#64748b;margin:0;">← Voltar para os meses</button>
+        <button onclick="gerarPDFMensal()" style="background:#7c3aed;margin:0;">🖨 Gerar PDF do Mês</button>
+    </div>
+    <h3 style="color:#1e3a8a;margin-bottom:4px;">📊 ${nomeMes} — Comparativo entre granjas</h3>
+    <div class="subtitulo">Marque abaixo quais granjas você quer ver no gráfico.</div>
+
+    ${checklistHtml}
+
+    <div id="graficoMensal" style="width:100%;overflow-x:auto;margin:16px 0;"></div>
+
+    <table class="tabela-ovos">
+        <thead>
+        <tr>
+            <th style="text-align:left;">Granja</th>
+            <th>Média do mês</th>
+            <th>Registros</th>
+            <th>Situação</th>
+        </tr>
+        </thead>
+        <tbody>
+            ${resumoLinhas.map(r => `
+                <tr>
+                    <td style="text-align:left;">
+                        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${r.cor};margin-right:6px;"></span>${r.nome}
+                    </td>
+                    <td>${r.media.toFixed(1)}%</td>
+                    <td>${r.registros}</td>
+                    <td class="${r.statusClass}">${r.media >= 80 ? "✅ Dentro da meta" : "⚠️ Abaixo da meta"}</td>
+                </tr>`).join("")}
+        </tbody>
+    </table>`;
+
+    cont.innerHTML = html;
+
+    atualizarGraficoComparativo();
+
+}
+
+// =============================
+// FILTRO DE GRANJAS NO GRÁFICO COMPARATIVO
+// =============================
+function atualizarGraficoComparativo(){
+
+    const checkboxes = document.querySelectorAll(".chk-granja-mes");
+
+    const indicesSelecionados =
+        [...checkboxes]
+        .filter(c => c.checked)
+        .map(c => Number(c.value));
+
+    const seriesFiltradas =
+        seriesMesAtual.filter((_, i) => indicesSelecionados.includes(i));
+
+    const elGrafico = document.getElementById("graficoMensal");
+
+    if(!elGrafico) return;
+
+    const larguraDisponivel = elGrafico.clientWidth || 800;
+
+    elGrafico.innerHTML =
+        gerarGraficoMultiplasSeries(seriesFiltradas, chaveMesAtual, larguraDisponivel);
+
+}
+
+function selecionarTodasGranjas(){
+    document.querySelectorAll(".chk-granja-mes").forEach(c => c.checked = true);
+    atualizarGraficoComparativo();
+}
+
+function limparSelecaoGranjas(){
+    document.querySelectorAll(".chk-granja-mes").forEach(c => c.checked = false);
+    atualizarGraficoComparativo();
+}
+
+// =============================
+// GERAR PDF DO MÊS (RELATÓRIO POR GRANJA, VIA IMPRESSÃO)
+// =============================
+function gerarPDFMensal(){
+
+    if(!chaveMesAtual){
+        alert("Abra um mês específico antes de gerar o PDF.");
+        return;
+    }
+
+    const [ano, mes] = chaveMesAtual.split("-").map(Number);
+    const nomeMes = `${NOMES_MESES[mes-1]} de ${ano}`;
+
+    const granjas = [];
+
+    Object.values(dadosTodosLotes).forEach(lote => {
+
+        const diasDoMes =
+            Object.keys(lote.producaoOvos)
+            .filter(d => d.startsWith(chaveMesAtual))
+            .sort();
+
+        if(diasDoMes.length === 0) return;
+
+        const registros = diasDoMes.map(d => ({
+            data: d,
+            ovos: lote.producaoOvos[d].ovos,
+            efetivo: lote.producaoOvos[d].efetivo,
+            percentual: lote.producaoOvos[d].percentual
+        }));
+
+        const media = registros.reduce((s,r)=>s+r.percentual,0) / registros.length;
+        const diasAbaixo = registros.filter(r => r.percentual < 80).length;
+
+        granjas.push({
+            galpao: lote.galpao || "-",
+            produtor: lote.produtor || "-",
+            registros,
+            media,
+            diasAbaixo
+        });
+
+    });
+
+    if(granjas.length === 0){
+        alert("Não há registros de produção neste mês para gerar o PDF.");
+        return;
+    }
+
+    // Ordena as granjas de forma numérica/alfabética, mais fácil de conferir no papel
+    granjas.sort((a,b) => a.galpao.localeCompare(b.galpao, "pt", { numeric:true }));
+
+    const paginasHtml = granjas.map(g => `
+        <div class="granja-page">
+
+            <div class="cabecalho">
+                <div>
+                    <h1>Granja ${g.galpao}</h1>
+                    <div class="mes">${g.produtor}</div>
+                </div>
+                <div style="text-align:right;">
+                    <div class="mes-titulo">${nomeMes}</div>
+                    <div class="mes">Relatório de Produção</div>
+                </div>
+            </div>
+
+            <div class="resumo">
+                <div class="card">
+                    <div class="label">Média do mês</div>
+                    <div class="valor" style="color:${g.media >= 80 ? "#166534" : "#b91c1c"};">${g.media.toFixed(1)}%</div>
+                </div>
+                <div class="card">
+                    <div class="label">Registros</div>
+                    <div class="valor">${g.registros.length}</div>
+                </div>
+                <div class="card">
+                    <div class="label">Dias abaixo da meta</div>
+                    <div class="valor" style="color:${g.diasAbaixo > 0 ? "#b91c1c" : "#166534"};">${g.diasAbaixo}</div>
+                </div>
+                <div class="card">
+                    <div class="label">Situação geral</div>
+                    <div class="valor" style="font-size:13px;color:${g.media >= 80 ? "#166534" : "#b91c1c"};">${g.media >= 80 ? "Dentro da meta" : "Abaixo da meta"}</div>
+                </div>
+            </div>
+
+            <table>
+                <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Ovos Produzidos</th>
+                    <th>Aves Efetivas</th>
+                    <th>% Postura</th>
+                    <th>Situação</th>
+                </tr>
+                </thead>
+                <tbody>
+                    ${g.registros.map(r => `
+                        <tr>
+                            <td>${formatarDataBR(r.data)}</td>
+                            <td>${r.ovos}</td>
+                            <td>${r.efetivo}</td>
+                            <td>${r.percentual.toFixed(1)}%</td>
+                            <td class="${r.percentual >= 80 ? "status-ok" : "status-baixo"}">${r.percentual >= 80 ? "Dentro da meta" : "Abaixo da meta"}</td>
+                        </tr>`).join("")}
+                </tbody>
+            </table>
+
+            <div class="rodape">Gerado em ${new Date().toLocaleString("pt-BR")}</div>
+
+        </div>
+    `).join("");
+
+    const htmlRelatorio = `
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+    <meta charset="UTF-8">
+    <title>Relatório Mensal — ${nomeMes}</title>
+    <style>
+        @page{ size:A4; margin:14mm; }
+
+        *{ margin:0; padding:0; box-sizing:border-box; font-family:Arial, Helvetica, sans-serif; }
+
+        body{ color:#1e293b; }
+
+        .granja-page{ page-break-after:always; }
+        .granja-page:last-child{ page-break-after:auto; }
+
+        .cabecalho{
+            display:flex;
+            justify-content:space-between;
+            align-items:flex-start;
+            border-bottom:3px solid #1e40af;
+            padding-bottom:10px;
+            margin-bottom:14px;
+        }
+
+        .cabecalho h1{ font-size:22px; color:#1e3a8a; }
+        .cabecalho .mes{ font-size:12px; color:#555; margin-top:2px; }
+        .cabecalho .mes-titulo{ font-size:14px; font-weight:bold; color:#1e3a8a; }
+
+        .resumo{
+            display:flex;
+            gap:10px;
+            margin-bottom:16px;
+            flex-wrap:wrap;
+        }
+
+        .resumo .card{
+            flex:1;
+            min-width:110px;
+            background:#f1f5f9;
+            border-radius:8px;
+            padding:10px 12px;
+        }
+
+        .resumo .card .label{
+            font-size:9.5px;
+            color:#64748b;
+            font-weight:bold;
+            text-transform:uppercase;
+            letter-spacing:.3px;
+        }
+
+        .resumo .card .valor{ font-size:18px; font-weight:bold; margin-top:2px; }
+
+        table{ width:100%; border-collapse:collapse; font-size:11px; }
+
+        th{ background:#1e40af; color:#fff; padding:6px; text-align:center; }
+
+        td{ border:1px solid #e2e8f0; padding:5px 6px; text-align:center; }
+
+        tbody tr:nth-child(even) td{ background:#f8fafc; }
+
+        .status-ok{ color:#166534; font-weight:bold; }
+        .status-baixo{ color:#b91c1c; font-weight:bold; background:#fee2e2 !important; }
+
+        .rodape{ margin-top:10px; font-size:9px; color:#94a3b8; text-align:right; }
+    </style>
+    </head>
+    <body>
+        ${paginasHtml}
+    </body>
+    </html>`;
+
+    let iframe = document.getElementById("iframePDF");
+
+    if(!iframe){
+
+        iframe = document.createElement("iframe");
+        iframe.id = "iframePDF";
+        iframe.style.position = "fixed";
+        iframe.style.right = "0";
+        iframe.style.bottom = "0";
+        iframe.style.width = "0";
+        iframe.style.height = "0";
+        iframe.style.border = "none";
+
+        document.body.appendChild(iframe);
+
+    }
+
+    const docFrame = iframe.contentWindow.document;
+
+    docFrame.open();
+    docFrame.write(htmlRelatorio);
+    docFrame.close();
+
+    setTimeout(() => {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+    }, 350);
+
+}
+
+function gerarGraficoMultiplasSeries(series, chaveMes, larguraDisponivel){
+
+    const [ano, mes] = chaveMes.split("-").map(Number);
+    const totalDias = new Date(ano, mes, 0).getDate();
+
+    const mostrarRotulos = series.length > 0 && series.length <= 10;
+
+    const margem = { top:24, right: mostrarRotulos ? 78 : 24, bottom:40, left:50 };
+    const alturaGrafico = 320;
+    const larguraPorDia = 28;
+
+    const larguraMinima = Math.max(300, totalDias * larguraPorDia);
+    const larguraUtil = Math.max(300, larguraDisponivel - margem.left - margem.right);
+    const larguraGrafico = Math.max(larguraMinima, larguraUtil);
+
+    const larguraTotal = larguraGrafico + margem.left + margem.right;
+    const alturaTotal = alturaGrafico + margem.top + margem.bottom;
+
+    const escalaX = dia =>
+        margem.left + ((dia - 1) / (totalDias - 1 || 1)) * larguraGrafico;
+
+    const escalaY = v =>
+        margem.top + alturaGrafico - (Math.max(0, Math.min(v,100)) / 100) * alturaGrafico;
+
+    let svg = `<svg viewBox="0 0 ${larguraTotal} ${alturaTotal}" width="${larguraTotal}" height="${alturaTotal}" xmlns="http://www.w3.org/2000/svg" style="font-family:Arial, sans-serif;">`;
+
+    // Faixas de fundo alternadas (facilita a leitura horizontal)
+    for(let v=0; v<100; v+=20){
+        if((v/20) % 2 === 0){
+            svg += `<rect x="${margem.left}" y="${escalaY(v+20)}" width="${larguraGrafico}" height="${escalaY(v)-escalaY(v+20)}" fill="#f8fafc"/>`;
+        }
+    }
+
+    // grade + rótulos do eixo Y
+    [0,20,40,60,80,100].forEach(v=>{
+        const y = escalaY(v);
+        svg += `<line x1="${margem.left}" y1="${y}" x2="${margem.left+larguraGrafico}" y2="${y}" stroke="#e5e9f0" stroke-width="1" stroke-dasharray="3,4"/>`;
+        svg += `<text x="${margem.left-10}" y="${y+4}" font-size="11" fill="#64748b" text-anchor="end">${v}%</text>`;
+    });
+
+    // linha de meta (80%) em destaque
+    const y80 = escalaY(80);
+    svg += `<line x1="${margem.left}" y1="${y80}" x2="${margem.left+larguraGrafico}" y2="${y80}" stroke="#f59e0b" stroke-width="2" stroke-dasharray="7,5"/>`;
+    svg += `<text x="${margem.left+8}" y="${y80-8}" font-size="11" fill="#b45309" font-weight="bold">Meta 80%</text>`;
+
+    // moldura do gráfico
+    svg += `<rect x="${margem.left}" y="${margem.top}" width="${larguraGrafico}" height="${alturaGrafico}" fill="none" stroke="#cbd5e1" stroke-width="1"/>`;
+
+    const passo = totalDias > 20 ? 2 : 1;
+
+    for(let dia=1; dia<=totalDias; dia+=passo){
+        svg += `<text x="${escalaX(dia)}" y="${margem.top+alturaGrafico+20}" font-size="10" fill="#64748b" text-anchor="middle">${dia}</text>`;
+    }
+
+    if(series.length === 0){
+
+        svg += `<text x="${larguraTotal/2}" y="${alturaTotal/2}" font-size="14" fill="#94a3b8" text-anchor="middle">Marque ao menos uma granja acima para ver o gráfico</text>`;
+
+    }else{
+
+        // Desenha primeiro um "halo" branco por trás de todas as linhas,
+        // para elas não se misturarem visualmente quando se cruzam
+        series.forEach(serie => {
+
+            const pontosOrdenados = serie.pontos.slice().sort((a,b)=>a.dia-b.dia);
+            const pontosXY = pontosOrdenados.map(p => ({ x: escalaX(p.dia), y: escalaY(p.percentual) }));
+            const pathSuave = gerarPathSuave(pontosXY);
+
+            svg += `<path d="${pathSuave}" fill="none" stroke="#ffffff" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>`;
+
+        });
+
+        series.forEach(serie => {
+
+            const pontosOrdenados = serie.pontos.slice().sort((a,b)=>a.dia-b.dia);
+            const pontosXY = pontosOrdenados.map(p => ({ x: escalaX(p.dia), y: escalaY(p.percentual) }));
+            const pathSuave = gerarPathSuave(pontosXY);
+
+            svg += `<path d="${pathSuave}" fill="none" stroke="${serie.cor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+
+            pontosXY.forEach((p, i) => {
+                svg += `<circle cx="${p.x}" cy="${p.y}" r="3.5" fill="${serie.cor}" stroke="#fff" stroke-width="1.3"><title>${serie.nome} — dia ${pontosOrdenados[i].dia}: ${pontosOrdenados[i].percentual.toFixed(1)}%</title></circle>`;
+            });
+
+            // Rótulo no final da linha, com o código curto da granja
+            if(mostrarRotulos && pontosXY.length > 0){
+
+                const ultimo = pontosXY[pontosXY.length - 1];
+                const nomeCurto = serie.nome.split("—")[0].trim();
+
+                svg += `
+                <circle cx="${ultimo.x}" cy="${ultimo.y}" r="5" fill="${serie.cor}" stroke="#fff" stroke-width="1.5"/>
+                <rect x="${ultimo.x+9}" y="${ultimo.y-9}" width="${Math.max(30, nomeCurto.length*7+14)}" height="18" rx="9" fill="${serie.cor}"/>
+                <text x="${ultimo.x+9+Math.max(30, nomeCurto.length*7+14)/2}" y="${ultimo.y+4}" font-size="10.5" font-weight="bold" fill="#fff" text-anchor="middle">${nomeCurto}</text>`;
+
+            }
+
+        });
+
+    }
+
+    svg += `</svg>`;
+
+    return svg;
+
+}
+
+// =============================
 function abrirModal(texto) {
     document.getElementById("textoModal").textContent = texto;
     document.getElementById("modalDatas").style.display = "block";
@@ -1925,9 +2776,20 @@ document
 .addEventListener("change", importarBackup);
 
 window.addEventListener("resize", () => {
+
     if(document.getElementById("modalDetalhamento").style.display === "flex"){
         renderizarGraficoOvos();
     }
+
+    if(
+        document.getElementById("modalMensal").style.display === "flex" &&
+        document.getElementById("detalheMesContainer").style.display === "block" &&
+        document.getElementById("graficoMensal")
+    ){
+        // Apenas recalcula a largura do gráfico, mantendo as granjas marcadas
+        atualizarGraficoComparativo();
+    }
+
 });
 
 async function iniciar(){
@@ -1943,6 +2805,11 @@ iniciar();
 window.salvarLote = salvarLote;
 window.novoLote = novoLote;
 window.excluirLote = excluirLote;
+window.arquivarLote = arquivarLote;
+window.abrirArquivados = abrirArquivados;
+window.fecharModalArquivados = fecharModalArquivados;
+window.restaurarLote = restaurarLote;
+window.excluirArquivadoDefinitivo = excluirArquivadoDefinitivo;
 window.carregarLote = carregarLote;
 window.calcular = calcular;
 window.autoSalvar = autoSalvar;
@@ -1957,6 +2824,14 @@ window.excluirRegistroOvos = excluirRegistroOvos;
 window.atualizarEfetivoParaData = atualizarEfetivoParaData;
 window.renderizarGraficoOvos = renderizarGraficoOvos;
 window.limparFiltroGrafico = limparFiltroGrafico;
+window.abrirVisaoMensal = abrirVisaoMensal;
+window.fecharModalMensal = fecharModalMensal;
+window.abrirMesEspecifico = abrirMesEspecifico;
+window.voltarListaMeses = voltarListaMeses;
+window.atualizarGraficoComparativo = atualizarGraficoComparativo;
+window.selecionarTodasGranjas = selecionarTodasGranjas;
+window.limparSelecaoGranjas = limparSelecaoGranjas;
+window.gerarPDFMensal = gerarPDFMensal;
 
 </script>
 <div id="modalDetalhamento" class="modal-overlay">
@@ -2012,6 +2887,34 @@ window.limparFiltroGrafico = limparFiltroGrafico;
     <div id="containerHistorico"></div>
 
     <button class="btn-fechar-modal" onclick="fecharDetalhamento()">Fechar</button>
+
+</div>
+</div>
+
+<div id="modalMensal" class="modal-overlay">
+<div class="modal-box">
+
+    <h2>📅 Visão Mensal — Todas as Granjas</h2>
+    <div class="subtitulo">Veja a produção de todas as granjas ativas, separada por mês.</div>
+
+    <div id="listaMeses"></div>
+
+    <div id="detalheMesContainer" style="display:none;"></div>
+
+    <button class="btn-fechar-modal" onclick="fecharModalMensal()">Fechar</button>
+
+</div>
+</div>
+
+<div id="modalArquivados" class="modal-overlay">
+<div class="modal-box">
+
+    <h2>📦 Granjas Arquivadas</h2>
+    <div class="subtitulo">Granjas arquivadas ficam guardadas aqui, fora da lista principal, e podem ser restauradas quando quiser.</div>
+
+    <div id="listaArquivados" style="margin-top:16px;"></div>
+
+    <button class="btn-fechar-modal" onclick="fecharModalArquivados()">Fechar</button>
 
 </div>
 </div>
