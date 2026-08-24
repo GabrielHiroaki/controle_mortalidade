@@ -1108,6 +1108,20 @@ async function salvarLote(auto = false) {
     }
 }
 
+// Ordena nomes de granja: começando com letra primeiro (A, B, C...),
+// depois os que começam com número, em ordem numérica natural (1,2,10,11...)
+function compararNomesGranja(a, b){
+
+    const aComecaComNumero = /^[0-9]/.test(a);
+    const bComecaComNumero = /^[0-9]/.test(b);
+
+    if(aComecaComNumero && !bComecaComNumero) return 1;
+    if(!aComecaComNumero && bComecaComNumero) return -1;
+
+    return a.localeCompare(b, "pt", { numeric:true, sensitivity:"base" });
+
+}
+
 async function carregarLista(){
 
     let select =
@@ -1126,6 +1140,8 @@ async function carregarLista(){
         collection(db,"lotes")
     );
 
+    const nomesAtivos = [];
+
     snapshot.forEach(docItem=>{
 
         const d = docItem.data();
@@ -1133,14 +1149,22 @@ async function carregarLista(){
         // Granjas arquivadas não aparecem na lista principal
         if(d.arquivado === true) return;
 
+        nomesAtivos.push(docItem.id);
+
+    });
+
+    nomesAtivos.sort(compararNomesGranja);
+
+    nomesAtivos.forEach(nome=>{
+
         let op =
         document.createElement("option");
 
         op.value =
-        docItem.id;
+        nome;
 
         op.textContent =
-        docItem.id;
+        nome;
 
         select.appendChild(op);
 
@@ -1372,7 +1396,8 @@ async function abrirArquivados(){
                         <div style="font-size:13px;color:#555;">${item.dados.produtor || "-"}</div>
                         <div style="font-size:12px;color:#94a3b8;">Arquivado em ${item.dados.dataArquivamento || "-"}</div>
                     </div>
-                    <div style="display:flex;gap:8px;">
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        <button onclick="visualizarArquivado('${item.id}')" style="background:#2563eb;padding:8px 14px;font-size:13px;margin:0;">👁 Visualizar</button>
                         <button onclick="restaurarLote('${item.id}')" style="background:#16a34a;padding:8px 14px;font-size:13px;margin:0;">♻ Restaurar</button>
                         <button onclick="excluirArquivadoDefinitivo('${item.id}')" style="background:#dc2626;padding:8px 14px;font-size:13px;margin:0;">🗑 Excluir definitivo</button>
                     </div>
@@ -1443,6 +1468,223 @@ async function restaurarLote(idArquivo){
         alert("Erro ao restaurar:\n\n" + error.message);
 
     }
+
+}
+
+// =============================
+// VISUALIZAR GRANJA ARQUIVADA (SOMENTE LEITURA)
+// =============================
+async function visualizarArquivado(idArquivo){
+
+    try{
+
+        const snap = await getDoc(doc(db, "lotes", idArquivo));
+
+        if(!snap.exists()){
+            alert("Registro arquivado não encontrado.");
+            return;
+        }
+
+        const d = snap.data();
+        const nomeOriginal = d.nomeOriginal || d.galpao || idArquivo;
+
+        document.getElementById("tituloVisualizarArquivo").textContent =
+            `👁 Granja ${nomeOriginal} (somente leitura)`;
+
+        document.getElementById("subtituloVisualizarArquivo").textContent =
+            `Arquivado em ${d.dataArquivamento || "-"} — visualizar aqui não altera nada, mesmo que já exista uma granja ativa com esse mesmo nome.`;
+
+        document.getElementById("infoVisualizarArquivo").innerHTML = `
+            <span class="efetivo-box" style="background:#dbeafe;color:#1e3a8a;">👤 ${d.produtor || "-"}</span>
+            <span class="efetivo-box" style="background:#dbeafe;color:#1e3a8a;">📅 Nascimento: ${d.nascimento ? formatarDataBR(d.nascimento) : "-"}</span>
+            <span class="efetivo-box" style="background:#dbeafe;color:#1e3a8a;">🐔 Aves Inicial: ${d.avesInicial || "-"}</span>
+            <span class="efetivo-box" style="background:#dbeafe;color:#1e3a8a;">📄 GTA: ${d.gta || "-"}</span>
+        `;
+
+        document.getElementById("tabelaMortalidadeArquivo").innerHTML =
+            gerarTabelaMortalidadeArquivo(d);
+
+        document.getElementById("producaoArquivoContainer").innerHTML =
+            gerarHtmlProducaoArquivada(d.producaoOvos || {});
+
+        document.getElementById("modalVisualizarArquivo").style.display = "flex";
+
+    }catch(error){
+
+        console.error(error);
+        alert("Erro ao visualizar granja arquivada:\n\n" + error.message);
+
+    }
+
+}
+
+function fecharModalVisualizarArquivo(){
+    document.getElementById("modalVisualizarArquivo").style.display = "none";
+}
+
+// Recalcula o histórico de mortalidade a partir dos dados salvos,
+// sem mexer na tabela/DOM da granja ativa
+function gerarTabelaMortalidadeArquivo(d){
+
+    const avesInicial = Number(d.avesInicial) || 0;
+    const semanaInicialArq = d.semanaInicial || 0;
+    const ajustes = d.ajustesEfetivo || {};
+    const mortalidade = d.mortalidade || {};
+    const nascimento = d.nascimento;
+
+    let acumulado = 0;
+    let efetivoAtual = avesInicial;
+
+    const linhas = [];
+    let ultimaComDados = 0;
+
+    for(let semana=1; semana<=200; semana++){
+
+        const m = mortalidade["semana_"+semana] || {};
+        const dias = [m.qui, m.sex, m.sab, m.dom, m.seg, m.ter, m.qua].map(v => Number(v) || 0);
+        const soma = dias.reduce((a,b)=>a+b, 0);
+
+        let acumuladoLinha, efetivoLinha;
+
+        if(semanaInicialArq == 0){
+
+            acumulado += soma;
+            acumuladoLinha = acumulado;
+
+            if(ajustes[semana] !== undefined) efetivoAtual = ajustes[semana];
+            efetivoAtual -= soma;
+            efetivoLinha = efetivoAtual;
+
+        }else if(semana < semanaInicialArq){
+
+            acumuladoLinha = null;
+            efetivoLinha = null;
+
+        }else if(semana === semanaInicialArq){
+
+            acumulado = 0;
+            acumuladoLinha = 0;
+
+            if(ajustes[semana] !== undefined){
+                efetivoAtual = ajustes[semana];
+                efetivoLinha = efetivoAtual;
+            }else{
+                efetivoLinha = null;
+            }
+
+        }else{
+
+            acumulado += soma;
+            acumuladoLinha = acumulado;
+
+            if(ajustes[semana] !== undefined) efetivoAtual = ajustes[semana];
+            efetivoAtual -= soma;
+            efetivoLinha = efetivoAtual;
+
+        }
+
+        if(soma > 0 || ajustes[semana] !== undefined){
+            ultimaComDados = semana;
+        }
+
+        linhas.push({ semana, dias, soma, acumulado: acumuladoLinha, efetivo: efetivoLinha });
+
+    }
+
+    if(ultimaComDados === 0){
+        return `<p style="text-align:center;color:#94a3b8;padding:16px;">Nenhum dado de mortalidade lançado.</p>`;
+    }
+
+    const linhasExibir = linhas.slice(0, ultimaComDados);
+
+    const periodoDaSemana = semana => {
+
+        if(!nascimento) return "-";
+
+        const dataBase = parseDataLocal(nascimento);
+        const inicio = new Date(dataBase);
+        inicio.setDate(dataBase.getDate() + (semana-1)*7);
+
+        const fim = new Date(inicio);
+        fim.setDate(inicio.getDate()+6);
+
+        const fmt = dt => dt.toLocaleDateString("pt-BR");
+
+        return `${fmt(inicio)} a ${fmt(fim)}`;
+
+    };
+
+    return `
+    <table class="tabela-ovos" style="font-size:11px;">
+        <thead>
+        <tr>
+            <th>Semana</th>
+            <th>Período</th>
+            <th>Qui</th><th>Sex</th><th>Sáb</th><th>Dom</th><th>Seg</th><th>Ter</th><th>Qua</th>
+            <th>Total</th>
+            <th>Acumulado</th>
+            <th>Efetivo</th>
+        </tr>
+        </thead>
+        <tbody>
+            ${linhasExibir.map(l => `
+                <tr>
+                    <td>${l.semana}</td>
+                    <td>${periodoDaSemana(l.semana)}</td>
+                    ${l.dias.map(v => `<td>${v}</td>`).join("")}
+                    <td style="font-weight:bold;">${l.soma}</td>
+                    <td>${l.acumulado === null ? "-" : l.acumulado}</td>
+                    <td>${l.efetivo === null ? "-" : l.efetivo}</td>
+                </tr>`).join("")}
+        </tbody>
+    </table>`;
+
+}
+
+// Monta o histórico de produção de ovos da granja arquivada, agrupado por mês
+function gerarHtmlProducaoArquivada(producaoOvos){
+
+    const datas = Object.keys(producaoOvos).sort();
+
+    if(datas.length === 0){
+        return `<p style="text-align:center;color:#94a3b8;padding:16px;">Nenhum registro de produção lançado.</p>`;
+    }
+
+    const grupos = {};
+
+    datas.forEach(data => {
+        const chave = data.slice(0,7);
+        if(!grupos[chave]) grupos[chave] = [];
+        grupos[chave].push(data);
+    });
+
+    const chaves = Object.keys(grupos).sort().reverse();
+
+    return chaves.map((chave, indice) => {
+
+        const [ano, mes] = chave.split("-").map(Number);
+        const nomeMes = `${NOMES_MESES[mes-1]} de ${ano}`;
+        const registros = grupos[chave].slice().sort().reverse();
+
+        return `
+        <details ${indice === 0 ? "open" : ""} style="margin-bottom:10px;border:1px solid #cbd5e1;border-radius:10px;overflow:hidden;">
+            <summary style="cursor:pointer;background:#1e40af;color:#fff;padding:10px 14px;font-weight:bold;">📅 ${nomeMes} — ${registros.length} registro${registros.length > 1 ? "s" : ""}</summary>
+            <table class="tabela-ovos" style="margin-top:0;border:none;border-radius:0;">
+                <thead>
+                <tr><th>Data</th><th>Ovos</th><th>Aves Efetivas</th><th>%</th><th>Situação</th></tr>
+                </thead>
+                <tbody>
+                    ${registros.map(data => {
+                        const reg = producaoOvos[data];
+                        const cls = reg.percentual >= 80 ? "status-ok" : "status-baixo";
+                        const status = reg.percentual >= 80 ? "✅ Dentro da meta" : "⚠️ Abaixo da meta";
+                        return `<tr><td>${formatarDataBR(data)}</td><td>${reg.ovos}</td><td>${reg.efetivo}</td><td>${reg.percentual.toFixed(1)}%</td><td class="${cls}">${status}</td></tr>`;
+                    }).join("")}
+                </tbody>
+            </table>
+        </details>`;
+
+    }).join("");
 
 }
 
@@ -2810,6 +3052,8 @@ window.abrirArquivados = abrirArquivados;
 window.fecharModalArquivados = fecharModalArquivados;
 window.restaurarLote = restaurarLote;
 window.excluirArquivadoDefinitivo = excluirArquivadoDefinitivo;
+window.visualizarArquivado = visualizarArquivado;
+window.fecharModalVisualizarArquivo = fecharModalVisualizarArquivo;
 window.carregarLote = carregarLote;
 window.calcular = calcular;
 window.autoSalvar = autoSalvar;
@@ -2915,6 +3159,25 @@ window.gerarPDFMensal = gerarPDFMensal;
     <div id="listaArquivados" style="margin-top:16px;"></div>
 
     <button class="btn-fechar-modal" onclick="fecharModalArquivados()">Fechar</button>
+
+</div>
+</div>
+
+<div id="modalVisualizarArquivo" class="modal-overlay">
+<div class="modal-box" style="max-width:1000px;">
+
+    <h2 id="tituloVisualizarArquivo">Visualizando granja arquivada</h2>
+    <div class="subtitulo" id="subtituloVisualizarArquivo"></div>
+
+    <div id="infoVisualizarArquivo" style="display:flex;gap:12px;flex-wrap:wrap;margin:16px 0;"></div>
+
+    <h3 style="color:#1e3a8a;margin-bottom:8px;">🐔 Histórico de mortalidade</h3>
+    <div id="tabelaMortalidadeArquivo" style="overflow-x:auto;margin-bottom:22px;"></div>
+
+    <h3 style="color:#1e3a8a;margin-bottom:8px;">🥚 Produção de ovos</h3>
+    <div id="producaoArquivoContainer"></div>
+
+    <button class="btn-fechar-modal" onclick="fecharModalVisualizarArquivo()">Fechar</button>
 
 </div>
 </div>
